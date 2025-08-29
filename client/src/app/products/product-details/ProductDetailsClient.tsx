@@ -270,14 +270,14 @@ export default function ProductDetailsClient() {
 
             {/* Action Buttons */}
             <div className="flex gap-x-3 md:gap-x-4 sticky bottom-0 md:relative bg-white py-4 md:py-0">
-              <button
+              {/* <button
                 className="flex-1 bg-black text-white py-2.5 md:py-3 px-3 text-sm md:text-base rounded-lg hover:bg-gray-800 cursor-pointer active:scale-95 transition-transform"
                 onClick={() => console.log("Buy product clicked")}
               >
                 BUY PRODUCT
-              </button>
+              </button> */}
               <button
-                className="flex-1 bg-white text-black border py-2.5 md:py-3 px-3 text-sm md:text-base rounded-lg hover:bg-gray-50 cursor-pointer active:scale-95 transition-transform"
+                className="flex-1 bg-black text-white border py-2.5 md:py-3 px-3 text-sm md:text-base rounded-lg hover:bg-gray-50 cursor-pointer active:scale-95 transition-transform"
                 onClick={handleAddToCart}
               >
                 ADD TO CART
