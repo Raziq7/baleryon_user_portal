@@ -48,10 +48,15 @@ const authSlice = createSlice({
 
     // Do the same mapping anywhere else you set `state.user`:
     builder.addCase(signupUserThunk.fulfilled, (state, action) => {
+      console.log(action.payload.user,"useruseruseruseruseruseruser");
+      console.log(action.payload?.message,"00000000000000000000000000000");
+
+      
       state.loading = false;
-      state.user = mapApiUserToStoreUser(action.payload.user as ApiUser);
+      // state.user = mapApiUserToStoreUser(action.payload.user as ApiUser);
       state.token = action.payload.token;
-      state.isAuthenticated = true;
+      state.otpRequired = action.payload?.message == "OTP sent to email" ? true : false ;
+      state.isAuthenticated = false;
     });
 
     builder.addCase(verifyOtpThunk.fulfilled, (state, action) => {

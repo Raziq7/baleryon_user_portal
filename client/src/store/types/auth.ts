@@ -24,20 +24,20 @@ export const mapApiUserToStoreUser = (u: ApiUser): User => ({
 });
 
 export interface AuthResponse {
-    token: string; // The JWT token returned upon successful login
-    user: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-      mobileNo: string;
-      gender: string;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }
+  token: string; // The JWT token returned upon successful login
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    mobileNo: string;
+    gender: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
 
-  // SignUpRequest.ts
+// SignUpRequest.ts
 export interface SignUpRequest {
   firstName: string;
   lastName: string;
@@ -47,59 +47,61 @@ export interface SignUpRequest {
   gender: string;
 }
 
-
-  // SignUpResponse.ts
+// SignUpResponse.ts
 export interface SignUpResponse {
-    message: string;
-    token:string;
-    user: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-      mobileNo: string;
-      gender: string;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }
+  message: string;
+  token: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    mobileNo: string;
+    gender: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
 
-
-  // Define this inline or create a new file `OtpVerificationData.ts`
+// Define this inline or create a new file `OtpVerificationData.ts`
 export interface OtpVerificationData {
   email: string;
   otp: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  password: string;
+  gender: string;
 }
-  
-  // OtpSubmitResponse.ts
-export interface OtpSubmitResponse {
-    message: string; // Message indicating the result of the OTP verification
-    user: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-      mobileNo: string;
-      gender: string;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }
 
-  // ApiErrorResponse.ts
+// OtpSubmitResponse.ts
+export interface OtpSubmitResponse {
+  message: string; // Message indicating the result of the OTP verification
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    mobileNo: string;
+    gender: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+// ApiErrorResponse.ts
 export interface ApiErrorResponse {
   message: string; // Error message from the server
   statusCode: number; // HTTP status code
   error: string; // Type of error (e.g., "BadRequest", "Unauthorized")
 }
 
-  // LoginRequest.ts
+// LoginRequest.ts
 
 export interface LoginRequest {
   email: string;
   password: string;
 }
-
 
 // LoginResponse.ts
 export interface LoginResponse {
@@ -117,23 +119,21 @@ export interface LoginResponse {
   };
 }
 
-
 // VerifyOtpResponse.ts
-export interface VerifyOtpResponse {
-  message: string;
-  token: string;
-  user: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    mobileNo: string;
-    gender: string;
-    createdAt: string;
-    updatedAt: string;
-  };
-}
-
+// export interface VerifyOtpResponse {
+//   message: string;
+//   token: string;
+//   user: {
+//     id: string;
+//     firstName: string;
+//     lastName: string;
+//     email: string;
+//     mobileNo: string;
+//     gender: string;
+//     createdAt: string;
+//     updatedAt: string;
+//   };
+// }
 
 // VerifyOtpResponse.ts
 export interface VerifyOtpResponse {

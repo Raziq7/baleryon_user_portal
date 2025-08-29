@@ -65,7 +65,7 @@ connect().then(() => console.log("DB connected"));
 
 // app.use("/api/auth/", authRouter);
 app.use("/api/user/product/", productRouter);
-app.use("/api/user/auth/", authRouter);
+app.use("/api/user/auth", authRouter);
 app.use("/api/user/cart/", cartRouter);
 app.use("/api/user/wishlist/", wishlistRouter);
 app.use("/api/user/order/", orderRouter);

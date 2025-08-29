@@ -1,30 +1,40 @@
 import * as React from "react"
-import { OTPInput, OTPInputContext, type OTPInputProps } from "input-otp"
-import { MinusIcon } from "lucide-react"
-
-import { cn } from "../../lib/utils"
+import { OTPInput, type SlotProps, type OTPInputProps,REGEXP_ONLY_DIGITS } from "input-otp"
+// import { MinusIcon } from "lucide-react"
 
 type InputOTPProps = OTPInputProps & {
   containerClassName?: string;
 };
 
+// Small utility; replace with your cn if you have one
+function cn(...classes: Array<string | undefined>) {
+  return classes.filter(Boolean).join(" ")
+}
+
 function InputOTP({
   className,
   containerClassName,
+  // Good defaults: numeric keyboard + numeric-only pattern
+  inputMode = "numeric",
+  pattern = REGEXP_ONLY_DIGITS as unknown as string,
   ...props
 }: InputOTPProps) {
   return (
     <OTPInput
       data-slot="input-otp"
+      inputMode={inputMode}
+      pattern={pattern}
       containerClassName={cn(
-        "flex items-center gap-2 has-disabled:opacity-50",
+        "group relative flex items-center justify-center has-[:disabled]:opacity-50",
         containerClassName
       )}
-      className={cn("disabled:cursor-not-allowed", className)}
+      className={cn("focus-visible:ring-0 disabled:cursor-not-allowed", className)}
       {...props}
     />
   )
 }
+
+
 
 function InputOTPGroup({
   className,
@@ -39,28 +49,35 @@ function InputOTPGroup({
   )
 }
 
-interface InputOTPSlotProps extends React.HTMLAttributes<HTMLDivElement> {
-  index: number
-}
+// interface InputOTPSlotProps extends React.HTMLAttributes<HTMLDivElement> {
+//   index: number
+// }
 
-function InputOTPSlot({ index, className, ...props }: InputOTPSlotProps) {
-  const inputOTPContext = React.useContext(OTPInputContext)
-  const { char, hasFakeCaret, isActive } = inputOTPContext?.slots?.[index] ?? {}
+function InputOTPSlot(props: SlotProps & { className?: string }) {
+  const { isActive, hasFakeCaret, char, placeholderChar, ...rest } = props
 
   return (
     <div
+      // CRITICAL: spread the slot props so clicks/typing route to the hidden input
+      {...rest}
       data-slot="input-otp-slot"
-      data-active={isActive}
       className={cn(
-        "data-[active=true]:border-ring data-[active=true]:ring-ring/50 data-[active=true]:aria-invalid:ring-destructive/20 dark:data-[active=true]:aria-invalid:ring-destructive/40 aria-invalid:border-destructive data-[active=true]:aria-invalid:border-destructive border-input relative flex h-9 w-9 items-center justify-center border-y border-r text-sm font-mono font-semibold text-foreground shadow-xs transition-all outline-none first:rounded-l-md first:border-l last:rounded-r-md data-[active=true]:z-10 data-[active=true]:ring-[3px]",
-        className
+        "relative w-10 h-14 text-[2rem]",
+        "flex items-center justify-center",
+        "transition-all duration-300",
+        "border-border border-y border-r first:border-l first:rounded-l-md last:rounded-r-md",
+        "group-hover:border-accent-foreground/20 group-focus-within:border-accent-foreground/20",
+        "outline outline-0 outline-accent-foreground/20",
+        isActive ? "outline-4 outline-accent-foreground" : "",
+        props.className
       )}
-      {...props}
     >
-      <span className="z-10">{char}</span> {/* Ensures it's always visible */}
+      <div className="group-has-[input[data-input-otp-placeholder-shown]]:opacity-20">
+        {char ?? placeholderChar ?? ""}
+      </div>
       {hasFakeCaret && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="animate-caret-blink bg-foreground h-4 w-px duration-1000" />
+        <div className="absolute pointer-events-none inset-0 flex items-center justify-center animate-caret-blink">
+          <div className="w-px h-8 bg-foreground" />
         </div>
       )}
     </div>
@@ -70,10 +87,16 @@ function InputOTPSlot({ index, className, ...props }: InputOTPSlotProps) {
 
 function InputOTPSeparator(props: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div data-slot="input-otp-separator" role="separator" {...props}>
-      <MinusIcon />
+    <div
+      data-slot="input-otp-separator"
+      role="separator"
+      className="flex w-10 justify-center items-center"
+      {...props}
+    >
+      <div className="w-3 h-1 rounded-full bg-border" />
     </div>
   )
 }
+
 
 export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator }

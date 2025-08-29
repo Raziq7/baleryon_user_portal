@@ -1,12 +1,24 @@
 // src/store/thunks/authThunks.ts
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
-import type { LoginRequest, OtpVerificationData, SignUpRequest, SignUpResponse, LoginResponse, VerifyOtpResponse } from "../types/auth";
-import { signupUser, loginUser, verifyOtp, logoutUser } from "../../api/authApi";
+import type {
+  LoginRequest,
+  OtpVerificationData,
+  SignUpRequest,
+  SignUpResponse,
+  LoginResponse,
+  VerifyOtpResponse,
+} from "../types/auth";
+import {
+  signupUser,
+  loginUser,
+  verifyOtp,
+  logoutUser,
+} from "../../api/authApi";
 
 // Signup (request OTP)
 export const signupUserThunk = createAsyncThunk<
-  SignUpResponse,                // what your API returns on signup (e.g., { message, otpSent, email? })
+  SignUpResponse, // what your API returns on signup (e.g., { message, otpSent, email? })
   SignUpRequest,
   { rejectValue: string }
 >("auth/signup", async (userData, { rejectWithValue }) => {
@@ -23,7 +35,7 @@ export const signupUserThunk = createAsyncThunk<
 
 // Login
 export const loginUserThunk = createAsyncThunk<
-  LoginResponse,                 // e.g., { user, token }
+  LoginResponse, // e.g., { user, token }
   LoginRequest,
   { rejectValue: string }
 >("auth/login", async (credentials, { rejectWithValue }) => {
@@ -40,20 +52,28 @@ export const loginUserThunk = createAsyncThunk<
 
 // Verify OTP
 export const verifyOtpThunk = createAsyncThunk<
-  VerifyOtpResponse,             // e.g., { user, token }
-  OtpVerificationData,           // { email, otp }
+  VerifyOtpResponse, // e.g., { user, token }
+  OtpVerificationData, // { email, otp }
   { rejectValue: string }
->("auth/verifyOtp", async ({ email, otp }, { rejectWithValue }) => {
-  try {
-    const response = await verifyOtp(email, otp);
-    return response;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      return rejectWithValue(error.response?.data?.message || "OTP verification failed");
+>(
+  "auth/verifyOtp",
+  async (
+    { email, otp, firstName, lastName, phone, password, gender },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await verifyOtp(email, otp, firstName, lastName, phone, password, gender);
+      return response;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        return rejectWithValue(
+          error.response?.data?.message || "OTP verification failed"
+        );
+      }
+      return rejectWithValue("An unexpected error occurred");
     }
-    return rejectWithValue("An unexpected error occurred");
   }
-});
+);
 
 // Logout
 export const logoutUserThunk = createAsyncThunk<
