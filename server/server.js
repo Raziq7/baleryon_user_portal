@@ -76,17 +76,19 @@ app.use("/api/user/setting", settingRouter);
 // user profile
 app.use("/api/user", userProfileRouter);
 
-app.get("/", (req, res) => {
-  res.send("API is running!");
-});
+// app.get("/", (req, res) => {
+//   res.send("API is running!");
+// });
 
 let dirname = path.resolve();
 
-if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(dirname, "../frontend", "out")));
 
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(dirname, "../client", "dist")));
+  
   app.get("*", (req, res) => {
-    res.sendFile(path.join(dirname, "../frontend", "out", "index.html"));
+    console.log(dirname,"process.env.NODE_ENVprocess.env.NODE_ENVprocess.env.NODE_ENV");
+    res.sendFile(path.join(dirname, "../client", "dist", "index.html"));
   });
 }
 
