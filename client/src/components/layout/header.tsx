@@ -30,17 +30,11 @@ const Header: React.FC = () => {
   const [searchText, setSearchText] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleLogOut = () => {
-    dispatch(logoutUserThunk());
-  };
-  const signupHandleClick = () => {
-    setShowSignupModal(true);
-  };
+  const handleLogOut = () => dispatch(logoutUserThunk());
+  const signupHandleClick = () => setShowSignupModal(true);
   const handleSearch = () => {
-    const query = searchText.trim();
-    if (query) {
-      window.location.href = `/products?search=${encodeURIComponent(query)}`;
-    }
+    const q = searchText.trim();
+    if (q) window.location.href = `/products?search=${encodeURIComponent(q)}`;
   };
   const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") handleSearch();
@@ -49,32 +43,16 @@ const Header: React.FC = () => {
 
   return (
     <header className="p-3 lg:p-5 text-black w-full border-b border-gray-200">
-      <div className="flex justify-between items-center w-full">
-        {/* Logo */}
-        <div style={{ width: "90px" }}>
-          <a href="/">
-            <img
-              src="/mainLogo.png"
-              alt="Logo"
-              style={{ objectFit: "cover", width: "100%" }}
-            />
-          </a>
-        </div>
-
-        {/* Search (hidden on small, visible on lg) */}
-        <div className="hidden lg:block lg:flex-1 lg:max-w-[28rem] relative mx-4">
+      {/* Top bar */}
+      <div className="relative flex items-center justify-between w-full">
+        {/* Left (Desktop): Search */}
+        <div className="hidden lg:block lg:flex-1 lg:max-w-[28rem] relative">
           <img
             src="/searchIcon.png"
             alt="Search"
             height={32}
             width={19}
-            style={{
-              position: "absolute",
-              left: "10px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              cursor: "pointer",
-            }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 cursor-pointer"
             onClick={handleSearch}
           />
           <input
@@ -87,12 +65,23 @@ const Header: React.FC = () => {
           />
         </div>
 
-        {/* Desktop Nav */}
-        <div className="hidden lg:flex items-center gap-8">
+        {/* Center: Logo (always perfectly centered) */}
+        <div className="absolute left-1/2 -translate-x-1/2 w-20 sm:w-24 md:w-28 lg:w-32 xl:w-36 z-10">
+          <a href="/" aria-label="Go to homepage">
+            <img
+              src="/baleryonWithTextBlack.png"
+              alt="Logo"
+              className="w-full h-auto object-contain block"
+            />
+          </a>
+        </div>
+
+        {/* Right (Desktop): Nav + Icons */}
+        <div className="hidden lg:flex items-center gap-8 lg:flex-1 justify-end">
           <ul className="flex gap-10">
-            {["Home", "Product", "About", "Contact"].map((text, idx) => (
+            {["Home", "Product", "About", "Contact"].map((text) => (
               <li
-                key={idx}
+                key={text}
                 className="hover:underline hover:text-[#544F51] cursor-pointer"
               >
                 <a
@@ -111,16 +100,19 @@ const Header: React.FC = () => {
               </li>
             ))}
           </ul>
+
           {/* Icons */}
           <div className="flex items-center gap-6">
-            <a href="/mywishlist">
+            <a href="/mywishlist" aria-label="Wishlist">
               <img src="/harts.png" alt="Wishlist" width={24} height={24} />
             </a>
             <Cartpopup />
             {!isLogin ? (
               <Dialog>
-                <DialogTrigger>
-                  <img src="/account.png" alt="Account" width={24} height={24} />
+                <DialogTrigger asChild>
+                  <button aria-label="Open account login">
+                    <img src="/account.png" alt="Account" width={24} height={24} />
+                  </button>
                 </DialogTrigger>
                 <DialogContent className="w-[400px]">
                   <DialogHeader>
@@ -134,7 +126,9 @@ const Header: React.FC = () => {
             ) : (
               <Popover>
                 <PopoverTrigger asChild>
-                  <img src="/account.png" alt="Account" width={24} height={24} />
+                  <button aria-label="Open account menu">
+                    <img src="/account.png" alt="Account" width={24} height={24} />
+                  </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-56 p-4 bg-white rounded-lg shadow-lg border border-gray-200">
                   <div className="flex gap-4 mb-4 items-center">
@@ -170,47 +164,44 @@ const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Hamburger */}
+        {/* Right (Mobile): Hamburger */}
         <button
-          className="lg:hidden flex items-center"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label="Toggle menu"
+          className="lg:hidden flex items-center ml-auto"
+          onClick={() => setMobileMenuOpen((s) => !s)}
         >
           {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
         </button>
       </div>
 
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden mt-4 space-y-4">
-          {/* Search on mobile */}
-          <div className="relative">
-            <img
-              src="/searchIcon.png"
-              alt="Search"
-              height={32}
-              width={19}
-              style={{
-                position: "absolute",
-                left: "10px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                cursor: "pointer",
-              }}
-              onClick={handleSearch}
-            />
-            <input
-              type="text"
-              placeholder="Search for products..."
-              className="border border-[#00000033] rounded-[10px] p-2 w-full pl-10"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              onKeyDown={handleKeyPress}
-            />
-          </div>
+      {/* Mobile: Search row */}
+      <div className="lg:hidden mt-3">
+        <div className="relative">
+          <img
+            src="/searchIcon.png"
+            alt="Search"
+            height={32}
+            width={19}
+            className="absolute left-2 top-1/2 -translate-y-1/2 cursor-pointer"
+            onClick={handleSearch}
+          />
+          <input
+            type="text"
+            placeholder="Search for products..."
+            className="border border-[#00000033] rounded-[10px] p-2 w-full pl-10"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            onKeyDown={handleKeyPress}
+          />
+        </div>
+      </div>
 
+      {/* Mobile Menu Panel */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden mt-4 space-y-4 animate-in fade-in slide-in-from-top-2">
           <ul className="flex flex-col gap-3">
-            {["Home", "Product", "About", "Contact"].map((text, idx) => (
-              <li key={idx} className="border-b pb-2">
+            {["Home", "Product", "About", "Contact"].map((text) => (
+              <li key={text} className="border-b pb-2">
                 <a
                   href={
                     text === "Product"
@@ -229,16 +220,18 @@ const Header: React.FC = () => {
             ))}
           </ul>
 
-          {/* Icons */}
-          <div className="flex items-center gap-6 mt-3">
-            <a href="/mywishlist">
+          {/* Mobile: Icons row */}
+          <div className="flex items-center gap-6">
+            <a href="/mywishlist" aria-label="Wishlist">
               <img src="/harts.png" alt="Wishlist" width={24} height={24} />
             </a>
             <Cartpopup />
             {!isLogin ? (
               <Dialog>
-                <DialogTrigger>
-                  <img src="/account.png" alt="Account" width={24} height={24} />
+                <DialogTrigger asChild>
+                  <button aria-label="Open account login">
+                    <img src="/account.png" alt="Account" width={24} height={24} />
+                  </button>
                 </DialogTrigger>
                 <DialogContent className="w-[400px]">
                   <DialogHeader>
@@ -251,7 +244,7 @@ const Header: React.FC = () => {
               </Dialog>
             ) : (
               <Button
-                className="w-full bg-red-500 hover:bg-red-600 text-white"
+                className="ml-auto bg-red-500 hover:bg-red-600 text-white"
                 onClick={handleLogOut}
               >
                 Log Out
