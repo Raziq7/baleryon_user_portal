@@ -17,14 +17,15 @@ import {
 } from "../../api/authApi";
 
 // Signup (request OTP)
+// In the thunk
 export const signupUserThunk = createAsyncThunk<
-  SignUpResponse, // what your API returns on signup (e.g., { message, otpSent, email? })
+  SignUpResponse & { pendingEmail: string }, // extend with what you need
   SignUpRequest,
   { rejectValue: string }
 >("auth/signup", async (userData, { rejectWithValue }) => {
   try {
     const response = await signupUser(userData);
-    return response;
+    return { ...response, pendingEmail: response.user.email ?? userData.email };
   } catch (error) {
     if (axios.isAxiosError(error)) {
       return rejectWithValue(error.response?.data?.message || "Signup failed");
@@ -32,6 +33,8 @@ export const signupUserThunk = createAsyncThunk<
     return rejectWithValue("An unexpected error occurred");
   }
 });
+
+
 
 // Login
 export const loginUserThunk = createAsyncThunk<

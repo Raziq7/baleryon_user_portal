@@ -4,38 +4,34 @@ import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../store/store";
 import { signupUserThunk, verifyOtpThunk } from "../store/thunks/authThunks";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select";
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
+  InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot,
 } from "../components/ui/input-otp";
 import type { SignUpRequest } from "../store/types/auth";
+
+// (Optional) tiny alert UI
+function ErrorAlert({ message }: { message: string }) {
+  if (!message) return null;
+  return (
+    <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+      {message}
+    </div>
+  );
+}
 
 type Props = { onClose: () => void };
 
 export default function SignupModal({ onClose }: Props) {
   const dispatch = useDispatch<AppDispatch>();
-
-  const { loading, isAuthenticated, otpRequired, pendingEmail } = useSelector(
-    (state: RootState) => state.auth
-  );
+  const { loading, isAuthenticated, otpRequired, pendingEmail, error } =
+    useSelector((state: RootState) => state.auth);
 
   const [showPassword, setShowPassword] = useState(false);
   const [credentialsState, setCredentialsState] = useState({
@@ -50,13 +46,11 @@ export default function SignupModal({ onClose }: Props) {
   });
 
   useEffect(() => {
-    // Autofill email on OTP step (optional)
     if (otpRequired && pendingEmail) {
       setCredentialsState((s) => ({ ...s, email: pendingEmail }));
     }
   }, [otpRequired, pendingEmail]);
 
-  // Close after successful verification (optional UX)
   useEffect(() => {
     if (isAuthenticated) onClose();
   }, [isAuthenticated, onClose]);
@@ -86,7 +80,6 @@ export default function SignupModal({ onClose }: Props) {
       newErrors.firstName = "First name is required";
     if (!credentialsState.lastName.trim())
       newErrors.lastName = "Last name is required";
-
     if (!/^\d{10}$/.test(credentialsState.mobileNo))
       newErrors.mobileNo = "Enter a valid 10-digit mobile number";
     if (!credentialsState.gender) newErrors.gender = "Select a gender";
@@ -108,7 +101,7 @@ export default function SignupModal({ onClose }: Props) {
     return !Object.values(newErrors).some(Boolean);
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateSignUp()) return;
 
@@ -153,14 +146,15 @@ export default function SignupModal({ onClose }: Props) {
               {otpRequired ? "Verify OTP" : "Sign Up"}
             </CardTitle>
           </CardHeader>
+
           <CardContent>
+            {/* Global server error (from Redux) */}
+            {error ? <div className="mb-4"><ErrorAlert message={error} /></div> : null}
+
             {otpRequired ? (
-              // Inside your OTP step of SignupModal
               <form onSubmit={handleOtpSubmit} className="space-y-6">
                 <div className="space-y-3">
-                  <Label htmlFor="otp-input">
-                    Enter OTP sent to your email
-                  </Label>
+                  <Label htmlFor="otp-input">Enter OTP sent to your email</Label>
                   <InputOTP
                     id="otp-input"
                     autoFocus
@@ -169,10 +163,6 @@ export default function SignupModal({ onClose }: Props) {
                     onChange={(val) =>
                       setCredentialsState((s) => ({ ...s, otp: val ?? "" }))
                     }
-                    onComplete={() => {
-                      // Optional: auto-submit when all 6 chars are entered
-                      // handleOtpSubmit(new Event("submit") as unknown as React.FormEvent)
-                    }}
                     render={({ slots }) => (
                       <InputOTPGroup>
                         {slots.slice(0, 3).map((slot, idx) => (
@@ -186,12 +176,13 @@ export default function SignupModal({ onClose }: Props) {
                     )}
                   />
                 </div>
+
                 <Button
                   type="submit"
                   className="w-full bg-black text-white hover:bg-gray-700"
                   disabled={loading || credentialsState.otp.length !== 6}
                 >
-                  Verify OTP
+                  {loading ? "Verifying..." : "Verify OTP"}
                 </Button>
               </form>
             ) : (
@@ -201,10 +192,7 @@ export default function SignupModal({ onClose }: Props) {
                   <Input
                     value={credentialsState.firstName}
                     onChange={(e) =>
-                      setCredentialsState((s) => ({
-                        ...s,
-                        firstName: e.target.value,
-                      }))
+                      setCredentialsState((s) => ({ ...s, firstName: e.target.value }))
                     }
                   />
                   {errors.firstName && (
@@ -217,10 +205,7 @@ export default function SignupModal({ onClose }: Props) {
                   <Input
                     value={credentialsState.lastName}
                     onChange={(e) =>
-                      setCredentialsState((s) => ({
-                        ...s,
-                        lastName: e.target.value,
-                      }))
+                      setCredentialsState((s) => ({ ...s, lastName: e.target.value }))
                     }
                   />
                   {errors.lastName && (
@@ -234,10 +219,7 @@ export default function SignupModal({ onClose }: Props) {
                     type="tel"
                     value={credentialsState.mobileNo}
                     onChange={(e) =>
-                      setCredentialsState((s) => ({
-                        ...s,
-                        mobileNo: e.target.value,
-                      }))
+                      setCredentialsState((s) => ({ ...s, mobileNo: e.target.value }))
                     }
                   />
                   {errors.mobileNo && (
@@ -273,10 +255,7 @@ export default function SignupModal({ onClose }: Props) {
                     type="email"
                     value={credentialsState.email}
                     onChange={(e) =>
-                      setCredentialsState((s) => ({
-                        ...s,
-                        email: e.target.value,
-                      }))
+                      setCredentialsState((s) => ({ ...s, email: e.target.value }))
                     }
                   />
                   {errors.email && (
@@ -291,10 +270,7 @@ export default function SignupModal({ onClose }: Props) {
                       type={showPassword ? "text" : "password"}
                       value={credentialsState.password}
                       onChange={(e) =>
-                        setCredentialsState((s) => ({
-                          ...s,
-                          password: e.target.value,
-                        }))
+                        setCredentialsState((s) => ({ ...s, password: e.target.value }))
                       }
                       className="pr-10"
                     />
@@ -324,9 +300,7 @@ export default function SignupModal({ onClose }: Props) {
                     }
                   />
                   {errors.confirmPassword && (
-                    <p className="text-sm text-red-500">
-                      {errors.confirmPassword}
-                    </p>
+                    <p className="text-sm text-red-500">{errors.confirmPassword}</p>
                   )}
                 </div>
 
@@ -335,7 +309,7 @@ export default function SignupModal({ onClose }: Props) {
                   className="w-full bg-black text-white hover:bg-gray-700"
                   disabled={loading}
                 >
-                  Sign Up
+                  {loading ? "Creating account..." : "Sign Up"}
                 </Button>
               </form>
             )}

@@ -31,7 +31,7 @@ export default function ProductDetailsClient() {
   const productDetails = useSelector(selectProduct);
   const error = useSelector(selectProductError);
   const loading = useSelector(selectProductLoading);
-  
+
   function calculateDiscount(
     originalPrice: number,
     discountedPrice: number
@@ -79,15 +79,15 @@ export default function ProductDetailsClient() {
       await dispatch(addToCartThunk(productPayload)).unwrap();
       toast.success("Added to cart");
     } catch (err) {
-      console.log(err, "errrrrrrrrrrrrrrrrororororoorororororororor");
-
-      toast.error(err as string); // Will now correctly show: "User is not logged in"
+      toast.error(err as string); 
     }
   };
 
   useEffect(() => {
     if (productID) dispatch(fetchProductByIdThunk(productID));
-  }, [productID]);
+    // force to top
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [productID, dispatch]);
 
   return (
     <div className="min-h-screen">

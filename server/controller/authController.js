@@ -35,7 +35,7 @@ const comparePasswords = async (password, hashedPassword) => {
 // @route   POST /api/user/auth
 // @access  Public
 export const authController = asyncHandler(async (req, res) => {
-    let { email, password, otp, isSignUp, firstName, lastName, phone, gender } = req.body;
+    let { email, password, isSignUp } = req.body;
 
     console.log(req.body, "req.body");
 
