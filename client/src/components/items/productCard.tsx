@@ -1,47 +1,94 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ProductDetail } from "../../store/types/product";
 import { useDispatch, useSelector } from "react-redux";
-import { Heart,Trash } from "lucide-react";
+import { Heart, Trash } from "lucide-react";
 import type { RootState } from "../../store/store";
-import { toggleWishlistItem, initializeWishlist } from "../../store/slices/wishlistSlice";
+import {
+  toggleWishlistItem,
+  initializeWishlist,
+} from "../../store/slices/wishlistSlice";
 import { addToWishlist } from "../../api/wishlistApi";
-
 
 interface ProductCardProps {
   prodctname: string;
   prodctID: string;
   price: number;
   image: string;
-    productDetail: ProductDetail;
+  productDetail: ProductDetail;
 }
+
+const formatINR = (n?: number) =>
+  typeof n === "number"
+    ? new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n)
+    : "0";
 
 export const ProductCard: React.FC<ProductCardProps> = ({
   prodctname,
   prodctID,
   price,
   image,
-  productDetail
+  productDetail,
 }) => {
   const navigate = useNavigate();
+  const [imgErr, setImgErr] = useState(false);
+
+  const goToDetails = () => navigate(`/products/product-details/${prodctID}`);
 
   return (
-    <div className="w-full h-full group">
-      <div className="w-full flex justify-center items-center flex-col relative">
-        <img width={236} height={367} src={image} alt="Product" />
-        <div className="absolute bottom-0 w-full opacity-0 translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
+    <div className="group w-full">
+      {/* Media */}
+      <div className="relative w-full rounded-xl overflow-hidden bg-gray-50">
+        {/* Keep a consistent tall ratio like the screenshot */}
+        <div className="w-full aspect-[3/4]">
+          <img
+            src={
+              !imgErr && image ? image : "/cardProductImage.png" /* fallback */
+            }
+            alt={prodctname}
+            loading="lazy"
+            onError={() => setImgErr(true)}
+            className="h-full w-full object-cover"
+          />
+        </div>
+
+        {/* Top-right wishlist (visual only; wire up when ready) */}
+        <button
+          type="button"
+          aria-label="Add to wishlist"
+          className="absolute top-2 right-2 rounded-full bg-white/90 p-2 shadow-md backdrop-blur-sm transition hover:bg-white"
+        >
+          <Heart className="h-5 w-5" />
+        </button>
+
+        {/* Desktop/hover “View” bar */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
           <button
-            className="w-full py-4 text-white bg-black"
-            onClick={() => navigate(`/products/product-details/${prodctID}`)}
+            onClick={goToDetails}
+            className="pointer-events-auto w-full py-3 text-white bg-black/90 hover:bg-black"
           >
             View
           </button>
         </div>
       </div>
-      <div className="flex justify-between">
-        <p>{prodctname}</p>
-        <p>₹ {price || "000"}</p>
+
+      {/* Meta */}
+      <div className="mt-2 flex items-start justify-between gap-2">
+        <p className="text-[13px] sm:text-[14px] leading-tight line-clamp-2">
+          {prodctname}
+        </p>
+        <p className="text-[13px] sm:text-[14px] font-medium whitespace-nowrap">
+          ₹ {formatINR(price)}
+        </p>
       </div>
+
+      {/* Mobile CTA (since no hover) */}
+      <button
+        onClick={goToDetails}
+        className="sm:hidden mt-2 w-full py-2 text-sm rounded-md border border-gray-900 text-gray-900 active:scale-[0.99]"
+      >
+        View
+      </button>
     </div>
   );
 };
@@ -53,9 +100,14 @@ interface ProductCard2Props {
   prodctID: string;
   index: number;
   price: number;
-  image: string;
+  image?: string;
   productDetail: ProductDetail;
 }
+
+// const formatINR = (n?: number) =>
+//   typeof n === "number"
+//     ? new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n)
+//     : "0";
 
 export const ProductCard2: React.FC<ProductCard2Props> = ({
   prodctname,
@@ -66,81 +118,163 @@ export const ProductCard2: React.FC<ProductCard2Props> = ({
 }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const wishlistItems = useSelector((state: RootState) => state.wishlist.items);
+  const wishlistItems = useSelector((s: RootState) => s.wishlist.items);
+
+  const [imgErr, setImgErr] = useState(false);
+  const isInWishlist = wishlistItems.some((item) => item._id === prodctID);
 
   useEffect(() => {
     dispatch(initializeWishlist());
   }, [dispatch]);
-
-  const isInWishlist = wishlistItems.some((item) => item._id === prodctID);
 
   const handleWishlistToggle = () => {
     dispatch(toggleWishlistItem(productDetail));
     addToWishlist(productDetail._id, productDetail.sizes, productDetail.color);
   };
 
+  const goToDetails = () => navigate(`/products/product-details/${prodctID}`);
+
   return (
-    <div className="p-3 bg-white rounded shadow-md">
-      <img
-        src={image || "/cardProductImage.png"}
-        alt="cardImage"
-        className="w-full rounded mb-3"
-      />
-      <div className="flex justify-between">
+    <div className="group w-full">
+      {/* Media */}
+      <div className="relative w-full rounded-xl overflow-hidden bg-gray-50">
+        {/* Fixed tall ratio so cards align */}
+        <div className="w-full aspect-[3/4]">
+          <img
+            src={!imgErr && image ? image : "/cardProductImage.png"}
+            alt={prodctname}
+            loading="lazy"
+            onError={() => setImgErr(true)}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+          />
+        </div>
+
+        {/* Wishlist heart */}
+        <button
+          type="button"
+          onClick={handleWishlistToggle}
+          aria-label="Toggle Wishlist"
+          className="absolute top-2 right-2 rounded-full bg-white/90 p-2 shadow-md backdrop-blur-sm hover:bg-white"
+        >
+          {isInWishlist ? (
+            <Heart className="h-5 w-5" color="red" fill="red" />
+          ) : (
+            <Heart className="h-5 w-5" />
+          )}
+        </button>
+
+        {/* Desktop hover View bar */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
+          <button
+            onClick={goToDetails}
+            className="pointer-events-auto w-full py-3 text-white bg-black/90 hover:bg-black"
+          >
+            View
+          </button>
+        </div>
+      </div>
+
+      {/* Meta */}
+      <div className="mt-2 flex items-start justify-between gap-2">
         <p
-          onClick={() => navigate(`/products/product-details/${prodctID}`)}
-          className="cursor-pointer"
+          onClick={goToDetails}
+          className="text-[13px] sm:text-[14px] leading-tight line-clamp-2 cursor-pointer"
         >
           {prodctname}
         </p>
-        <button onClick={handleWishlistToggle} aria-label="Toggle Wishlist">
-          {isInWishlist ? <Heart color="red" fill="red" /> : <Heart />}
-        </button>
+        <p className="text-[13px] sm:text-[14px] font-medium whitespace-nowrap">
+          ₹ {formatINR(price)}
+        </p>
       </div>
-      <p className="font-semibold">₹ {price}</p>
+
+      {/* Mobile CTA (no hover) */}
+      <button
+        onClick={goToDetails}
+        className="sm:hidden mt-2 w-full py-2 text-sm rounded-md border border-gray-900 text-gray-900 active:scale-[0.99]"
+      >
+        View
+      </button>
     </div>
   );
 };
 
 // ------------- ProductListCard Component -------------------
-
 interface ProductListCardProps {
   productDetail: ProductDetail;
 }
+
+// const formatINR = (n?: number) =>
+//   typeof n === "number"
+//     ? new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n)
+//     : "0";
 
 export const ProductListCard: React.FC<ProductListCardProps> = ({
   productDetail,
 }) => {
   const navigate = useNavigate();
-console.log(productDetail,"productDetailproductDetailproductDetailproductDetailproductDetail");
+  const [imgErr, setImgErr] = useState(false);
+
+  const goToDetails = () =>
+    navigate(`/products/product-details/${productDetail._id}`);
 
   return (
-    <div className="shadow-lg rounded group">
-      <div className="relative">
-        <img
-          src={productDetail.image[0]}
-          alt={productDetail.productName}
-          className="w-full h-auto"
-        />
-        <div className="absolute bottom-0 w-full opacity-0 translate-y-4 transition-all group-hover:opacity-100 group-hover:translate-y-0">
+    <div className="group w-full">
+      {/* Media */}
+      <div className="relative w-full rounded-xl overflow-hidden bg-gray-50">
+        <div className="w-full aspect-[3/4]">
+          <img
+            src={
+              !imgErr && productDetail.image?.[0]
+                ? productDetail.image[0]
+                : "/cardProductImage.png"
+            }
+            alt={productDetail.productName}
+            loading="lazy"
+            onError={() => setImgErr(true)}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+          />
+        </div>
+
+        {/* (Optional) wishlist icon — hook up to your slice if needed */}
+        <button
+          type="button"
+          aria-label="Wishlist"
+          className="absolute top-2 right-2 rounded-full bg-white/90 p-2 shadow-md backdrop-blur-sm hover:bg-white"
+        >
+          <Heart className="h-5 w-5" />
+        </button>
+
+        {/* Desktop hover "View" strip */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
           <button
-            className="w-full py-3 bg-black text-white"
-            onClick={() => navigate(`/products/product-details/${productDetail._id}`)}
+            onClick={goToDetails}
+            className="pointer-events-auto w-full py-3 text-white bg-black/90 hover:bg-black"
           >
-            View Product
+            View
           </button>
         </div>
       </div>
-      <div className="p-3">
-        <div className="flex justify-between">
-          <p>{productDetail.productName}</p>
-          <p>₹ {productDetail.price}</p>
-        </div>
-        <div className="flex justify-between text-sm text-gray-600">
-          <p>2 colors</p>
-          <p style={{ textDecoration: "line-through" }}>₹ {productDetail.discount}</p>
-        </div>
+
+      {/* Meta */}
+      <div className="mt-2 flex items-start justify-between gap-2">
+        <p
+          onClick={goToDetails}
+          className="text-[13px] sm:text-[14px] leading-tight line-clamp-2 cursor-pointer"
+        >
+          {productDetail.productName}
+        </p>
+        <p className="text-[13px] sm:text-[14px] font-medium whitespace-nowrap">
+          ₹ {formatINR(productDetail.price)}
+        </p>
       </div>
+
+      {/* Mobile CTA */}
+      <button
+        onClick={goToDetails}
+        className="sm:hidden mt-2 w-full py-2 text-sm rounded-md border border-gray-900 text-gray-900 active:scale-[0.99]"
+      >
+        View
+      </button>
     </div>
   );
 };
@@ -176,7 +310,9 @@ export const WishListCard: React.FC<WishListCardProps> = ({
         <div className="absolute bottom-0 w-full opacity-0 group-hover:opacity-100 transition">
           <button
             className="w-full py-4 bg-black text-white"
-            onClick={() => navigate(`/products/product-details/${productDetail._id}`)}
+            onClick={() =>
+              navigate(`/products/product-details/${productDetail._id}`)
+            }
           >
             View
           </button>

@@ -61,7 +61,7 @@ export default function Home() {
       </section>
 
       {/* Latest Product */}
-      <section className="mt-20 text-center">
+      {/* <section className="mt-20 text-center">
         <h3 className="text-xl sm:text-2xl font-semibold">LATEST PRODUCT</h3>
         <p className="text-[#7C7C7C] mb-4">Comfort with your style</p>
         <div className="flex">
@@ -84,7 +84,7 @@ export default function Home() {
             />
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Subscribe Section */}
       <section

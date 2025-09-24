@@ -1,7 +1,5 @@
 // src/components/lists/OurCollectionsProductList.tsx
-import { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import type { AppDispatch } from "@/store/store"; // if you have typed dispatch
+import { useSelector } from "react-redux";
 import { ProductCard } from "../items/productCard";
 import {
   selectProducts,
@@ -14,30 +12,53 @@ function OurCollectionsProductList() {
   const loading = useSelector(selectProductsLoading);
   const error = useSelector(selectProductsError);
 
-  // useEffect(() => {
-  //   dispatch(fetchProductsThunk());
-  // }, [dispatch]);
-
   if (loading) {
-    return <div className="text-center py-12">Loading products...</div>;
+    return (
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="w-full aspect-[3/4] bg-gray-200 rounded-xl" />
+              <div className="mt-3 h-4 bg-gray-200 rounded" />
+              <div className="mt-2 h-4 w-1/3 bg-gray-200 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="text-center py-12 text-red-600">{error}</div>;
+    return (
+      <div className="text-center py-12 text-red-600">
+        {error}
+      </div>
+    );
+  }
+
+  if (!products?.length) {
+    return (
+      <div className="text-center py-12 text-gray-600">
+        No products found.
+      </div>
+    );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 justify-center items-center gap-x-16 gap-y-16 mx-auto w-full">
-      {products.map((product) => (
-        <ProductCard
-          key={product._id}
-          prodctname={product.productName}
-          prodctID={product._id}
-          price={product.price}
-          image={product.image?.[0]}
-          productDetail={product}
-        />
-      ))}
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+      {/* Mobile: 2 cols; Tablet: 3; Desktop: 4 */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
+        {products.map((p) => (
+          <ProductCard
+            key={p._id}
+            prodctname={p.productName}
+            prodctID={p._id}
+            price={p.price}
+            image={p.image?.[0]}
+            productDetail={p}
+          />
+        ))}
+      </div>
     </div>
   );
 }
