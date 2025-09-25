@@ -15,38 +15,26 @@ export const addToCartThunk = createAsyncThunk<
   CartData,
   { rejectValue: string }
 >("cart/addToCart", async (cartData, { rejectWithValue }) => {
+  const token = localStorage.getItem("token");
+  if (!token) return rejectWithValue("AUTH_REQUIRED"); // <— UI can check this
+
   try {
     const response = await addToCartData(cartData);
-
-    // Ensure response is valid
-    if (!response) {
-      return rejectWithValue(
-        "No response from server"
-      ) as unknown as ReturnType<typeof rejectWithValue>;
-    }
-
+    if (!response) return rejectWithValue("No response from server");
     return response;
   } catch (error) {
-    console.log(error, "error============================");
-
     if (axios.isAxiosError(error)) {
       return rejectWithValue(
         error.response?.data?.message || error.message || "Unknown Axios error"
-      ) as unknown as ReturnType<typeof rejectWithValue>;
+      );
     }
-
-    //Handle non-Axios errors (like Error("User is not logged in"))
     if (error instanceof Error) {
-      return rejectWithValue(error.message) as unknown as ReturnType<
-        typeof rejectWithValue
-      >;
+      return rejectWithValue(error.message);
     }
-
-    return rejectWithValue(
-      "An unknown error occurred"
-    ) as unknown as ReturnType<typeof rejectWithValue>;
+    return rejectWithValue("An unknown error occurred");
   }
 });
+
 // Fetch all cart items
 export const fetchCartItemsThunk = createAsyncThunk<
   CartResponse,

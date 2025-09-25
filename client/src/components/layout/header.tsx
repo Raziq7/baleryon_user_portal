@@ -1,3 +1,4 @@
+// src/layout/Header.tsx
 import React, { useEffect, useState, type KeyboardEvent } from "react";
 import { User, Menu, X } from "lucide-react";
 import { useDispatch } from "react-redux";
@@ -33,12 +34,15 @@ const Header: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const isLogin = useAuthToken();
 
-  const [showSignupModal, setShowSignupModal] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+
   const [searchText, setSearchText] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogOut = () => dispatch(logoutUserThunk());
-  const signupHandleClick = () => setShowSignupModal(true);
+  const openLogin = () => { setAuthMode("login"); setAuthOpen(true); };
+  const openSignup = () => { setAuthMode("signup"); setAuthOpen(true); };
 
   const handleSearch = () => {
     const q = searchText.trim();
@@ -90,7 +94,7 @@ const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Center: Logo (slightly reduced sizes) */}
+          {/* Center: Logo */}
           <div className="absolute left-1/2 -translate-x-1/2 z-10 w-16 sm:w-20 md:w-24 lg:w-28 xl:w-32">
             <a href="/" aria-label="Go to homepage">
               <img
@@ -125,18 +129,34 @@ const Header: React.FC = () => {
               <Cartpopup />
 
               {!isLogin ? (
-                <Dialog>
+                <Dialog open={authOpen} onOpenChange={setAuthOpen}>
                   <DialogTrigger asChild>
-                    <button aria-label="Open account login" className="opacity-90 hover:opacity-100">
+                    <button
+                      aria-label="Open account login"
+                      className="opacity-90 hover:opacity-100"
+                      onClick={openLogin}
+                    >
                       <img src="/account.png" alt="Account" width={24} height={24} />
                     </button>
                   </DialogTrigger>
                   <DialogContent className="w-[400px]">
                     <DialogHeader>
-                      <DialogTitle className="text-xl">Login</DialogTitle>
+                      <DialogTitle className="text-xl">
+                        {authMode === "login" ? "Login" : "Sign Up"}
+                      </DialogTitle>
                     </DialogHeader>
                     <DialogDescription>
-                      <LoginForm signupClick={signupHandleClick} />
+                      {authMode === "login" ? (
+                        <LoginForm
+                          signupClick={() => setAuthMode("signup")}
+                          onSuccess={() => setAuthOpen(false)}
+                        />
+                      ) : (
+                        <SignupModal
+                          onClose={() => setAuthOpen(false)}
+                          onBackToLogin={() => setAuthMode("login")}
+                        />
+                      )}
                     </DialogDescription>
                   </DialogContent>
                 </Dialog>
@@ -212,19 +232,13 @@ const Header: React.FC = () => {
 
       {/* Mobile Menu Panel + overlay */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 transition ${
-          mobileMenuOpen ? "pointer-events-auto" : "pointer-events-none"
-        }`}
+        className={`lg:hidden fixed inset-0 z-40 transition ${mobileMenuOpen ? "pointer-events-auto" : "pointer-events-none"}`}
         aria-hidden={!mobileMenuOpen}
       >
-        {/* Dim overlay */}
         <div
-          className={`absolute inset-0 bg-black/30 transition-opacity ${
-            mobileMenuOpen ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 bg-black/30 transition-opacity ${mobileMenuOpen ? "opacity-100" : "opacity-0"}`}
           onClick={() => setMobileMenuOpen(false)}
         />
-        {/* Panel */}
         <div
           className={`absolute top-[64px] left-0 right-0 bg-white rounded-t-2xl shadow-lg px-4 pt-4 pb-6 transition-transform duration-300 ${
             mobileMenuOpen ? "translate-y-0" : "-translate-y-4 opacity-0"
@@ -252,19 +266,36 @@ const Header: React.FC = () => {
               <img src="/harts.png" alt="Wishlist" width={24} height={24} />
             </a>
             <Cartpopup />
+
             {!isLogin ? (
-              <Dialog>
+              <Dialog open={authOpen} onOpenChange={setAuthOpen}>
                 <DialogTrigger asChild>
-                  <button aria-label="Open account login" className="opacity-90 hover:opacity-100">
+                  <button
+                    aria-label="Open account login"
+                    className="opacity-90 hover:opacity-100"
+                    onClick={openLogin}
+                  >
                     <img src="/account.png" alt="Account" width={24} height={24} />
                   </button>
                 </DialogTrigger>
                 <DialogContent className="w-[400px]">
                   <DialogHeader>
-                    <DialogTitle className="text-xl">Login</DialogTitle>
+                    <DialogTitle className="text-xl">
+                      {authMode === "login" ? "Login" : "Sign Up"}
+                    </DialogTitle>
                   </DialogHeader>
                   <DialogDescription>
-                    <LoginForm signupClick={signupHandleClick} />
+                    {authMode === "login" ? (
+                      <LoginForm
+                        signupClick={() => setAuthMode("signup")}
+                        onSuccess={() => setAuthOpen(false)}
+                      />
+                    ) : (
+                      <SignupModal
+                        onClose={() => setAuthOpen(false)}
+                        onBackToLogin={() => setAuthMode("login")}
+                      />
+                    )}
                   </DialogDescription>
                 </DialogContent>
               </Dialog>
@@ -279,20 +310,6 @@ const Header: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Sign Up Modal */}
-      {showSignupModal && (
-        <Dialog open={showSignupModal} onOpenChange={setShowSignupModal}>
-          <DialogContent className="w-[400px]">
-            <DialogHeader>
-              <DialogTitle className="text-xl">Sign Up</DialogTitle>
-            </DialogHeader>
-            <DialogDescription>
-              <SignupModal onClose={() => setShowSignupModal(false)} />
-            </DialogDescription>
-          </DialogContent>
-        </Dialog>
-      )}
     </header>
   );
 };

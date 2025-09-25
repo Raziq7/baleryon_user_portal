@@ -32,8 +32,9 @@ export const addToCartData = async (cartData: CartData) => {
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      throw new (error.response?.data?.message || "Login failed")();
+      throw new Error(error.response?.data?.message || "Login failed");
     }
+    throw error; // non-axios errors
   }
 };
 

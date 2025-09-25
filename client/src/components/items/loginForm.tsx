@@ -1,3 +1,4 @@
+// src/components/items/loginForm.tsx
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../../store/store";
@@ -9,9 +10,10 @@ import type { LoginRequest } from "../../store/types/auth";
 
 type LoginFormProps = {
   signupClick: () => void;
+  onSuccess?: () => void; // ⬅️ NEW: close modal after success
 };
 
-const LoginForm: React.FC<LoginFormProps> = ({ signupClick }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ signupClick, onSuccess }) => {
   const dispatch = useDispatch<AppDispatch>();
   const { error, loading } = useSelector((state: RootState) => state.auth);
 
@@ -21,10 +23,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ signupClick }) => {
     password: "",
   });
 
-  const [errors, setErrors] = useState({
-    email: "",
-    password: "",
-  });
+  const [errors, setErrors] = useState({ email: "", password: "" });
 
   const validateSignIn = (): boolean => {
     const validationErrors = { email: "", password: "" };
@@ -33,11 +32,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ signupClick }) => {
     if (!credentials.email || !emailRegex.test(credentials.email)) {
       validationErrors.email = "Please enter a valid email";
     }
-
     if (!credentials.password) {
       validationErrors.password = "Password is required";
     }
-
     setErrors(validationErrors);
     return !Object.values(validationErrors).some((err) => err !== "");
   };
@@ -58,7 +55,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ signupClick }) => {
       const { token, user } = resultAction.payload;
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
-      // Redirect logic if needed (e.g. with react-router)
+      onSuccess?.(); // close modal if provided
+      // you can redirect here if needed
     }
   };
 
@@ -69,7 +67,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ signupClick }) => {
       )}
 
       <div className="flex flex-col gap-6">
-        {/* Email Field */}
+        {/* Email */}
         <div className="grid gap-3">
           <Label htmlFor="email">Email</Label>
           <Input
@@ -87,7 +85,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ signupClick }) => {
           )}
         </div>
 
-        {/* Password Field */}
+        {/* Password */}
         <div className="space-y-2">
           <div className="flex items-center">
             <Label htmlFor="password">Password</Label>
@@ -116,7 +114,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ signupClick }) => {
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
             >
               {showPassword ? <EyeOffIcon /> : <EyeIcon />}
             </button>
@@ -126,7 +124,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ signupClick }) => {
           )}
         </div>
 
-        {/* Submit and Signup */}
+        {/* Actions */}
         <div className="flex flex-col gap-3">
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Logging in..." : "Login"}
@@ -135,7 +133,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ signupClick }) => {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              signupClick();
+              signupClick(); // flips modal to signup
             }}
             className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
           >

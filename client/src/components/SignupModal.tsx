@@ -4,19 +4,26 @@ import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../store/store";
 import { signupUserThunk, verifyOtpThunk } from "../store/thunks/authThunks";
 
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Label } from "../components/ui/label";
-import { Input } from "../components/ui/input";
-import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "../components/ui/select";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import {
-  InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot,
-} from "../components/ui/input-otp";
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "./ui/input-otp";
 import type { SignUpRequest } from "../store/types/auth";
 
-// (Optional) tiny alert UI
+// Small inline alert
 function ErrorAlert({ message }: { message: string }) {
   if (!message) return null;
   return (
@@ -26,9 +33,15 @@ function ErrorAlert({ message }: { message: string }) {
   );
 }
 
-type Props = { onClose: () => void };
+type SignupModalProps = {
+  onClose: () => void;
+  onBackToLogin?: () => void; // optional "Back to Login"
+};
 
-export default function SignupModal({ onClose }: Props) {
+const SignupModal: React.FC<SignupModalProps> = ({
+  onClose,
+  onBackToLogin,
+}) => {
   const dispatch = useDispatch<AppDispatch>();
   const { loading, isAuthenticated, otpRequired, pendingEmail, error } =
     useSelector((state: RootState) => state.auth);
@@ -131,191 +144,226 @@ export default function SignupModal({ onClose }: Props) {
     );
   };
 
+  // NOTE: This component is rendered *inside* DialogContent; no extra overlay/wrapper.
   return (
-    <div className="fixed w-full inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="relative w-full max-w-md px-4">
-        <Card className="w-full shadow-lg bg-white">
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 text-gray-500 hover:text-gray-700"
-          >
-            ✕
-          </button>
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-center">
-              {otpRequired ? "Verify OTP" : "Sign Up"}
-            </CardTitle>
-          </CardHeader>
+    <div className="w-full">
+      <Card className="w-full shadow-none border-0">
+        <CardHeader className="px-0 pt-0">
+          <CardTitle className="text-2xl font-bold text-left">
+            {otpRequired ? "Verify OTP" : "Sign Up"}
+          </CardTitle>
+        </CardHeader>
 
-          <CardContent>
-            {/* Global server error (from Redux) */}
-            {error ? <div className="mb-4"><ErrorAlert message={error} /></div> : null}
+        <CardContent className="px-0">
+          {error ? (
+            <div className="mb-4">
+              <ErrorAlert message={error} />
+            </div>
+          ) : null}
 
-            {otpRequired ? (
-              <form onSubmit={handleOtpSubmit} className="space-y-6">
-                <div className="space-y-3">
-                  <Label htmlFor="otp-input">Enter OTP sent to your email</Label>
-                  <InputOTP
-                    id="otp-input"
-                    autoFocus
-                    maxLength={6}
-                    value={credentialsState.otp}
-                    onChange={(val) =>
-                      setCredentialsState((s) => ({ ...s, otp: val ?? "" }))
-                    }
-                    render={({ slots }) => (
-                      <InputOTPGroup>
-                        {slots.slice(0, 3).map((slot, idx) => (
-                          <InputOTPSlot key={`a-${idx}`} {...slot} />
-                        ))}
-                        <InputOTPSeparator />
-                        {slots.slice(3).map((slot, idx) => (
-                          <InputOTPSlot key={`b-${idx}`} {...slot} />
-                        ))}
-                      </InputOTPGroup>
-                    )}
-                  />
-                </div>
+          {otpRequired ? (
+            <form onSubmit={handleOtpSubmit} className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="otp-input">Enter OTP sent to your email</Label>
+                <InputOTP
+                  id="otp-input"
+                  autoFocus
+                  maxLength={6}
+                  value={credentialsState.otp}
+                  onChange={(val) =>
+                    setCredentialsState((s) => ({ ...s, otp: val ?? "" }))
+                  }
+                  render={({ slots }) => (
+                    <InputOTPGroup>
+                      {slots.slice(0, 3).map((slot, idx) => (
+                        <InputOTPSlot key={`a-${idx}`} {...slot} />
+                      ))}
+                      <InputOTPSeparator />
+                      {slots.slice(3).map((slot, idx) => (
+                        <InputOTPSlot key={`b-${idx}`} {...slot} />
+                      ))}
+                    </InputOTPGroup>
+                  )}
+                />
+              </div>
 
-                <Button
-                  type="submit"
-                  className="w-full bg-black text-white hover:bg-gray-700"
-                  disabled={loading || credentialsState.otp.length !== 6}
+              <Button
+                type="submit"
+                className="w-full bg-black text-white hover:bg-gray-800"
+                disabled={loading || credentialsState.otp.length !== 6}
+              >
+                {loading ? "Verifying..." : "Verify OTP"}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleFormSubmit} className="space-y-4">
+              <div>
+                <Label>First Name</Label>
+                <Input
+                  value={credentialsState.firstName}
+                  onChange={(e) =>
+                    setCredentialsState((s) => ({
+                      ...s,
+                      firstName: e.target.value,
+                    }))
+                  }
+                />
+                {errors.firstName && (
+                  <p className="text-sm text-red-500">{errors.firstName}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Last Name</Label>
+                <Input
+                  value={credentialsState.lastName}
+                  onChange={(e) =>
+                    setCredentialsState((s) => ({
+                      ...s,
+                      lastName: e.target.value,
+                    }))
+                  }
+                />
+                {errors.lastName && (
+                  <p className="text-sm text-red-500">{errors.lastName}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Mobile Number</Label>
+                <Input
+                  type="tel"
+                  value={credentialsState.mobileNo}
+                  onChange={(e) =>
+                    setCredentialsState((s) => ({
+                      ...s,
+                      mobileNo: e.target.value,
+                    }))
+                  }
+                />
+                {errors.mobileNo && (
+                  <p className="text-sm text-red-500">{errors.mobileNo}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Gender</Label>
+                <Select
+                  value={credentialsState.gender}
+                  onValueChange={(value) =>
+                    setCredentialsState((s) => ({ ...s, gender: value }))
+                  }
                 >
-                  {loading ? "Verifying..." : "Verify OTP"}
-                </Button>
-              </form>
-            ) : (
-              <form onSubmit={handleFormSubmit} className="space-y-4">
-                <div>
-                  <Label>First Name</Label>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.gender && (
+                  <p className="text-sm text-red-500">{errors.gender}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={credentialsState.email}
+                  onChange={(e) =>
+                    setCredentialsState((s) => ({
+                      ...s,
+                      email: e.target.value,
+                    }))
+                  }
+                />
+                {errors.email && (
+                  <p className="text-sm text-red-500">{errors.email}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Password</Label>
+                <div className="relative">
                   <Input
-                    value={credentialsState.firstName}
-                    onChange={(e) =>
-                      setCredentialsState((s) => ({ ...s, firstName: e.target.value }))
-                    }
-                  />
-                  {errors.firstName && (
-                    <p className="text-sm text-red-500">{errors.firstName}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label>Last Name</Label>
-                  <Input
-                    value={credentialsState.lastName}
-                    onChange={(e) =>
-                      setCredentialsState((s) => ({ ...s, lastName: e.target.value }))
-                    }
-                  />
-                  {errors.lastName && (
-                    <p className="text-sm text-red-500">{errors.lastName}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label>Mobile Number</Label>
-                  <Input
-                    type="tel"
-                    value={credentialsState.mobileNo}
-                    onChange={(e) =>
-                      setCredentialsState((s) => ({ ...s, mobileNo: e.target.value }))
-                    }
-                  />
-                  {errors.mobileNo && (
-                    <p className="text-sm text-red-500">{errors.mobileNo}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label>Gender</Label>
-                  <Select
-                    value={credentialsState.gender}
-                    onValueChange={(value) =>
-                      setCredentialsState((s) => ({ ...s, gender: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.gender && (
-                    <p className="text-sm text-red-500">{errors.gender}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={credentialsState.email}
-                    onChange={(e) =>
-                      setCredentialsState((s) => ({ ...s, email: e.target.value }))
-                    }
-                  />
-                  {errors.email && (
-                    <p className="text-sm text-red-500">{errors.email}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label>Password</Label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      value={credentialsState.password}
-                      onChange={(e) =>
-                        setCredentialsState((s) => ({ ...s, password: e.target.value }))
-                      }
-                      className="pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
-                    >
-                      {showPassword ? "Hide" : "Show"}
-                    </button>
-                  </div>
-                  {errors.password && (
-                    <p className="text-sm text-red-500">{errors.password}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label>Confirm Password</Label>
-                  <Input
-                    type="password"
-                    value={credentialsState.confirmPassword}
+                    type={showPassword ? "text" : "password"}
+                    value={credentialsState.password}
                     onChange={(e) =>
                       setCredentialsState((s) => ({
                         ...s,
-                        confirmPassword: e.target.value,
+                        password: e.target.value,
                       }))
                     }
+                    className="pr-10"
                   />
-                  {errors.confirmPassword && (
-                    <p className="text-sm text-red-500">{errors.confirmPassword}</p>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
                 </div>
+                {errors.password && (
+                  <p className="text-sm text-red-500">{errors.password}</p>
+                )}
+              </div>
 
-                <Button
-                  type="submit"
-                  className="w-full bg-black text-white hover:bg-gray-700"
-                  disabled={loading}
-                >
-                  {loading ? "Creating account..." : "Sign Up"}
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
+              <div>
+                <Label>Confirm Password</Label>
+                <Input
+                  type="password"
+                  value={credentialsState.confirmPassword}
+                  onChange={(e) =>
+                    setCredentialsState((s) => ({
+                      ...s,
+                      confirmPassword: e.target.value,
+                    }))
+                  }
+                />
+                {errors.confirmPassword && (
+                  <p className="text-sm text-red-500">
+                    {errors.confirmPassword}
+                  </p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-black text-white hover:bg-gray-800"
+                disabled={loading}
+              >
+                {loading ? "Creating account..." : "Sign Up"}
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Footer links inside dialog */}
+      <div className="mt-3 flex items-center justify-between">
+        {onBackToLogin && (
+          <button
+            type="button"
+            className="text-sm underline underline-offset-4"
+            onClick={onBackToLogin}
+          >
+            Back to Login
+          </button>
+        )}
+        <button
+          type="button"
+          className="text-sm text-gray-500 hover:text-gray-700"
+          onClick={onClose}
+        >
+          Close
+        </button>
       </div>
     </div>
   );
-}
+};
+
+export default SignupModal;
