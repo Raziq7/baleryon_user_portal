@@ -153,6 +153,50 @@ export const verifyOtpController = asyncHandler(async (req, res) => {
   });
 });
 
+// routes
+// POST /api/user/auth/password/forgot
+// POST /api/user/auth/password/reset
+
+// controllers (pseudo matching your existing style)
+export const forgotPasswordController = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ message: "Invalid email" });
+
+  const user = await User.findOne({ email: email.trim() });
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  const otp = generateOTP();
+  otpStore[`reset:${email}`] = { otp, time: Date.now() };
+
+  await sendEmail(email, "Reset Password OTP", `Your OTP is: ${otp}`);
+  return res.status(200).json({ message: "OTP sent" });
+});
+
+export const resetPasswordController = asyncHandler(async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  if (!email || !otp || !newPassword)
+    return res.status(400).json({ message: "Missing fields" });
+
+  const key = `reset:${email}`;
+  const entry = otpStore[key];
+  if (!entry) return res.status(400).json({ message: "OTP not found or expired" });
+  if (Date.now() - entry.time > 5 * 60 * 1000)
+    return res.status(400).json({ message: "OTP expired" });
+  if (String(entry.otp) !== String(otp))
+    return res.status(400).json({ message: "Invalid OTP" });
+
+  const user = await User.findOne({ email: email.trim() });
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  user.password = await hashPassword(newPassword.trim());
+  await user.save();
+  delete otpStore[key];
+
+  return res.status(200).json({ message: "Password reset successful" });
+});
+
+
 export const userLogoutController = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
 

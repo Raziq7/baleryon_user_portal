@@ -14,7 +14,11 @@ export function getToken(): string | null {
 export const getStoredAuth = () => {
   const token = localStorage.getItem(TOKEN_KEY);
   const userStr = localStorage.getItem(USER_KEY);
-  const user = userStr ? JSON.parse(userStr) : null;
+  // const user = userStr ? JSON.parse(userStr) : null;
+  let user = null;
+  try {
+    user = userStr ? JSON.parse(userStr) : null;
+  } catch {}
   return { token, user };
 };
 

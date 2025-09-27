@@ -1,17 +1,17 @@
 // src/api/authApi.ts
-import type { SignUpResponse, LoginResponse, VerifyOtpResponse } from "@/store/types/auth";
+import type { SignUpResponse, LoginResponse, VerifyOtpResponse, ApiUser } from "@/store/types/auth";
 import api from "../utils/baseUrl";
 import { setAuth, clearAuth } from "../utils/authToken";
+import { mapApiUserToStoreUser } from "../store/types/auth";
 
 export const signupUser = async (userData: {
   email: string; password: string; firstName: string; lastName: string; phone: string; gender: string;
 }) => {
-  // OTP send step — NO token here
   const { data } = await api.post<SignUpResponse>("/api/user/auth", {
     ...userData,
     isSignUp: true,
   });
-  return data; // expect {message: "..."} or similar
+  return data; // only message/email expected
 };
 
 export const loginUser = async (credentials: { email: string; password: string; }) => {
@@ -19,8 +19,8 @@ export const loginUser = async (credentials: { email: string; password: string; 
     ...credentials,
     isSignUp: false,
   });
-  // store token + user now
-  setAuth(data.token, data.user);
+  // Store normalized
+  setAuth(data.token, mapApiUserToStoreUser(data.user as ApiUser));
   return data;
 };
 
@@ -38,16 +38,40 @@ export const verifyOtp = async (
     otp,
     firstName,
     lastName,
-    mobile: phone,
+    mobile: phone, // server expects 'mobile'
     password,
     gender,
   });
-  // store token + user **after OTP verify succeeds**
-  if ((data as any).token) {
-    setAuth((data as any).token, (data as any).user);
+  if (data?.token && data?.user) {
+    setAuth(data.token, mapApiUserToStoreUser(data.user as ApiUser));
   }
   return data;
 };
+
+
+// --- Forgot password APIs ---
+export const requestPasswordReset = async (email: string) => {
+  // server: POST /api/user/auth/password/forgot  => { message: "OTP sent" }
+  const { data } = await api.post<{ message: string }>(
+    "/api/user/auth/password/forgot",
+    { email }
+  );
+  return data;
+};
+
+export const resetPasswordWithOtp = async (args: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}) => {
+  // server: POST /api/user/auth/password/reset => { message: "Password reset successful" }
+  const { data } = await api.post<{ message: string }>(
+    "/api/user/auth/password/reset",
+    args
+  );
+  return data;
+};
+
 
 export const logoutUser = async () => {
   try {

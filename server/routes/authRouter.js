@@ -1,5 +1,11 @@
 import express from "express";
-import { authController, userLogoutController, verifyOtpController } from "../controller/authController.js";
+import {
+  authController,
+  forgotPasswordController,
+  resetPasswordController,
+  userLogoutController,
+  verifyOtpController,
+} from "../controller/authController.js";
 import { verifyToken } from "../middlewares/tokenVerification.js";
 
 var router = express.Router();
@@ -10,10 +16,11 @@ router.route("/").post(authController);
 // verify-otp
 router.route("/verify-otp").post(verifyOtpController);
 
+router.route("/password/forgot").post(forgotPasswordController);
+
+router.route("/password/reset").post(resetPasswordController);
+
 // logout
-router.route("/logout").post(verifyToken,userLogoutController);
-
-
-
+router.route("/logout").post(verifyToken, userLogoutController);
 
 export default router;

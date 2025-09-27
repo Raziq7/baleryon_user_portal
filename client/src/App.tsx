@@ -20,6 +20,8 @@ import TermsCondition from "./app/terms-condition/page";
 import CancelRefund from "./app/cancel-refund/page";
 import ShippingPolicy from "./app/shipping-policy/page";
 import UserOrdersPage from "./app/orderList/UserOrdersPage";
+import Profile from "./app/profile/Profile";
+import EditProfilePage from "./app/profile/edit/EditProfilePage";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -37,7 +39,12 @@ function App() {
         <Route path="/products" element={<ShopPage />} />
         <Route path="/about-us" element={<About />} />
         <Route path="/contact-us" element={<ContactUsPage />} />
-        <Route path="/products/product-details/:id" element={<ProductDetailsClient />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/edit" element={<EditProfilePage />} />
+        <Route
+          path="/products/product-details/:id"
+          element={<ProductDetailsClient />}
+        />
         <Route path="/mywishlist" element={<WishlistPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/privacy-policy" element={<Privacy />} />
