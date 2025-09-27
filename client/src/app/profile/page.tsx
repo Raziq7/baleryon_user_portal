@@ -25,7 +25,7 @@ const Profile: React.FC = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("auth_token");
         const res = await api.get("/api/user/profile", {
           headers: {
             Authorization: `Bearer ${token}`,

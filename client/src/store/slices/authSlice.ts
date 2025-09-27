@@ -8,6 +8,7 @@ import {
 } from "../thunks/authThunks";
 import type { User, ApiUser } from "../types/auth";
 import { mapApiUserToStoreUser } from "../types/auth";
+import { getStoredAuth } from "../../utils/authToken";
 
 interface AuthState {
   user: User | null;
@@ -19,20 +20,33 @@ interface AuthState {
   pendingEmail: string | null;
 }
 
+const stored = typeof window !== "undefined" ? getStoredAuth() : { token: null, user: null };
+
 const initialState: AuthState = {
-  user: null,
-  token: null,
+  user: stored.user ? mapApiUserToStoreUser(stored.user as ApiUser) : null,
+  token: stored.token,
   loading: false,
   error: null,
-  isAuthenticated: false,
+  isAuthenticated: !!stored.token,
   otpRequired: false,
   pendingEmail: null,
 };
 
+
 const authSlice = createSlice({
   name: "auth",
   initialState,
-  reducers: {},
+  reducers: {
+    initFromStorage(state) {
+      const { token, user } = getStoredAuth();
+      state.token = token;
+      state.user = user ? mapApiUserToStoreUser(user as ApiUser) : null;
+      state.isAuthenticated = !!token;
+    },
+    clearError(state) {
+      state.error = null;
+    },
+  },
   extraReducers: (builder) => {
     // LOGIN
     builder
@@ -53,29 +67,48 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = (action.payload as string) ?? "Login failed";
         state.isAuthenticated = false;
+        // don't toggle otpRequired here; this is a pure login path
       });
 
-    // SIGNUP
+    // SIGNUP (Send OTP) — NO token, set otpRequired + pendingEmail
     builder
       .addCase(signupUserThunk.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(signupUserThunk.fulfilled, (state, action) => {
-  state.loading = false;
-  state.token = action.payload.token;
-  state.otpRequired = action.payload.message === "OTP sent to email";
-  state.isAuthenticated = false;
-  state.pendingEmail = action.payload.user?.email ?? null; // <-- use nested user.email
-  state.error = null;
-})
+        state.loading = false;
+
+        // support multiple backend payload shapes
+        const anyPayload = action.payload as any;
+        const message: string | undefined = anyPayload?.message;
+        const pendingEmailFromPayload: string | null =
+          anyPayload?.pendingEmail ??
+          anyPayload?.user?.email ??
+          anyPayload?.email ??
+          null;
+
+        // mark that we should show the OTP screen
+        state.otpRequired =
+          typeof message === "string"
+            ? /otp/i.test(message) // "OTP sent to email"
+            : true; // default to true if server didn't send a message, because we called signup
+
+        state.pendingEmail = pendingEmailFromPayload;
+
+        // explicitly do NOT authenticate here
+        state.token = null;
+        state.isAuthenticated = false;
+        state.error = null;
+      })
       .addCase(signupUserThunk.rejected, (state, action) => {
         state.loading = false;
         state.error = (action.payload as string) ?? "Sign up failed";
-        state.otpRequired = false;
+        state.otpRequired = false; // keep user on signup form when send-OTP fails
+        state.pendingEmail = null;
       });
 
-    // VERIFY OTP
+    // VERIFY OTP — set token/user if returned
     builder
       .addCase(verifyOtpThunk.pending, (state) => {
         state.loading = true;
@@ -83,26 +116,32 @@ const authSlice = createSlice({
       })
       .addCase(verifyOtpThunk.fulfilled, (state, action) => {
         state.loading = false;
-        if (action.payload.user) {
-          state.user = mapApiUserToStoreUser(action.payload.user as ApiUser);
+
+        const anyPayload = action.payload as any;
+
+        if (anyPayload?.user) {
+          state.user = mapApiUserToStoreUser(anyPayload.user as ApiUser);
         }
-        if ((action.payload as any).token) {
-          state.token = (action.payload as any).token;
+        if (anyPayload?.token) {
+          state.token = anyPayload.token;
           state.isAuthenticated = true;
+        } else {
+          // if no token returned (unexpected), remain unauthenticated
+          state.isAuthenticated = false;
         }
+
         state.otpRequired = false;
         state.pendingEmail = null;
         state.error = null;
       })
       .addCase(verifyOtpThunk.rejected, (state, action) => {
         state.loading = false;
-        // e.g. "Invalid OTP" from rejectWithValuep
         state.error = (action.payload as string) ?? "OTP verification failed";
-        // keep otpRequired true so the user stays on OTP screen
+        // stay on OTP screen so user can retry
         state.otpRequired = true;
       });
 
-    // LOGOUT
+    // LOGOUT — clear everything immediately (UI updates instantly)
     builder
       .addCase(logoutUserThunk.pending, (state) => {
         state.loading = true;
@@ -118,10 +157,17 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(logoutUserThunk.rejected, (state, action) => {
+        // We still consider the user logged out (thunk clears local auth in finally)
         state.loading = false;
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        state.otpRequired = false;
+        state.pendingEmail = null;
         state.error = (action.payload as string) ?? "Logout failed";
       });
   },
 });
 
+export const { initFromStorage,clearError } = authSlice.actions;
 export default authSlice.reducer;

@@ -1,10 +1,19 @@
-// api.js (or axios.js)
-import axios from 'axios';
+// src/utils/baseUrl.ts
+import axios from "axios";
+import { getStoredAuth } from "./authToken";
 
-// Create an Axios instance with a base URL
 const api = axios.create({
-  baseURL: 'https://baleryon.in',
-  // baseURL: 'http://localhost:8080',
+  // baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8080",
+   baseURL: "https://baleryon.in",
+});
+
+api.interceptors.request.use((config) => {
+  const { token } = getStoredAuth();
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export default api;

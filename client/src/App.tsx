@@ -1,4 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+// App.tsx
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import { useDispatch } from "react-redux";
+import type { AppDispatch } from "./store/store";
+import { initFromStorage } from "./store/slices/authSlice"; // <-- add this action
+
 import Home from "./app/products/OurCollection";
 import "./index.css";
 import Header from "./components/layout/header";
@@ -16,6 +22,13 @@ import ShippingPolicy from "./app/shipping-policy/page";
 import UserOrdersPage from "./app/orderList/UserOrdersPage";
 
 function App() {
+  const dispatch = useDispatch<AppDispatch>();
+
+  useEffect(() => {
+    // hydrate Redux auth from localStorage on first render
+    dispatch(initFromStorage());
+  }, [dispatch]);
+
   return (
     <Router>
       <Header />
@@ -24,10 +37,7 @@ function App() {
         <Route path="/products" element={<ShopPage />} />
         <Route path="/about-us" element={<About />} />
         <Route path="/contact-us" element={<ContactUsPage />} />
-        <Route
-          path="/products/product-details/:id"
-          element={<ProductDetailsClient />}
-        />
+        <Route path="/products/product-details/:id" element={<ProductDetailsClient />} />
         <Route path="/mywishlist" element={<WishlistPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/privacy-policy" element={<Privacy />} />
@@ -35,8 +45,6 @@ function App() {
         <Route path="/cancel-refund" element={<CancelRefund />} />
         <Route path="/shipping-policy" element={<ShippingPolicy />} />
         <Route path="/orderList" element={<UserOrdersPage />} />
-
-        {/* Add more routes as needed */}
       </Routes>
       <Footer />
     </Router>

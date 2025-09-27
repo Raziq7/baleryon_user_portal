@@ -16,6 +16,7 @@ const getConfig = () => {
     RAZOR_KEY_ID: process.env.RAZOR_KEY_ID,
     RAZOR_KEY_SECRET: process.env.RAZOR_KEY_SECRET,
     YOUR_WEBHOOK_SECRET : process.env.YOUR_WEBHOOK_SECRET,
+    POSTMARK_API_TOKEN :process.env.POSTMARK_API_TOKEN
     // AWS_ACCESS: process.env.AWS_ACCESS,
     // AWS_SECRETACCESS: process.env.AWS_SECRETACCESS,
     // S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,

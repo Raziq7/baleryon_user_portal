@@ -34,7 +34,7 @@ const WishlistPage = () => {
 
   useEffect(() => {
     setIsClient(true);
-    const storedToken = localStorage.getItem("token");
+    const storedToken = localStorage.getItem("auth_token");
     setToken(storedToken);
     getProductFromWishList();
   }, []);

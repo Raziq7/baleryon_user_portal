@@ -101,7 +101,7 @@ export default function ProductDetailsClient() {
   const error = useSelector(selectProductError);
 
   // quick check; we still re-check right before API call
-  const isLoggedIn = useMemo(() => !!localStorage.getItem("token"), []);
+  const isLoggedIn = useMemo(() => !!localStorage.getItem("auth_token"), []);
 
   function calculateDiscount(originalPrice: number, discountedPrice: number): string {
     if (originalPrice <= 0 || discountedPrice < 0 || discountedPrice > originalPrice) {
@@ -132,7 +132,7 @@ export default function ProductDetailsClient() {
 
   const handleAddToCart = async () => {
     // If not logged in, open login popup
-    if (!localStorage.getItem("token")) {
+    if (!localStorage.getItem("auth_token")) {
       openLogin();
       return;
     }

@@ -1,7 +1,7 @@
 // src/layout/Header.tsx
 import React, { useEffect, useState, type KeyboardEvent } from "react";
 import { User, Menu, X } from "lucide-react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Dialog,
   DialogContent,
@@ -19,9 +19,8 @@ import { Button } from "../../components/ui/button";
 import LoginForm from "../items/loginForm";
 import Cartpopup from "../items/cartpopup";
 import SignupModal from "../../components/SignupModal";
-import useAuthToken from "../../hooks/useAuthToken";
 import { logoutUserThunk } from "../../store/thunks/authThunks";
-import type { AppDispatch } from "../../store/store";
+import type { AppDispatch, RootState } from "../../store/store";
 
 const navItems = [
   { label: "Home", href: "/" },
@@ -32,17 +31,30 @@ const navItems = [
 
 const Header: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const isLogin = useAuthToken();
+
+  // 🔑 Read from Redux so UI re-renders on auth changes
+  const { isAuthenticated, user } = useSelector((s: RootState) => s.auth);
 
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
-
   const [searchText, setSearchText] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleLogOut = () => dispatch(logoutUserThunk());
-  const openLogin = () => { setAuthMode("login"); setAuthOpen(true); };
-  const openSignup = () => { setAuthMode("signup"); setAuthOpen(true); };
+  const handleLogOut = () => {
+    // close any UI instantly
+    setAuthOpen(false);
+    setMobileMenuOpen(false);
+    dispatch(logoutUserThunk());
+  };
+
+  const openLogin = () => {
+    setAuthMode("login");
+    setAuthOpen(true);
+  };
+  const openSignup = () => {
+    setAuthMode("signup");
+    setAuthOpen(true);
+  };
 
   const handleSearch = () => {
     const q = searchText.trim();
@@ -51,8 +63,6 @@ const Header: React.FC = () => {
   const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") handleSearch();
   };
-
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -128,7 +138,7 @@ const Header: React.FC = () => {
               </a>
               <Cartpopup />
 
-              {!isLogin ? (
+              {!isAuthenticated ? (
                 <Dialog open={authOpen} onOpenChange={setAuthOpen}>
                   <DialogTrigger asChild>
                     <button
@@ -173,8 +183,8 @@ const Header: React.FC = () => {
                         <User className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="font-medium text-gray-800 text-sm">{user.name}</p>
-                        <p className="text-gray-600 text-xs">{user.email}</p>
+                        <p className="font-medium text-gray-800 text-sm">{user?.name}</p>
+                        <p className="text-gray-600 text-xs">{user?.email}</p>
                       </div>
                     </div>
                     <div className="border-b border-gray-200 my-3" />
@@ -183,7 +193,10 @@ const Header: React.FC = () => {
                       <li><a className="text-gray-700 hover:text-black" href="/mywishlist">My Wishlist</a></li>
                       <li><a className="text-gray-700 hover:text-black" href="/orderList">My Orders</a></li>
                     </ul>
-                    <Button className="mt-4 w-full bg-red-500 hover:bg-red-600 text-white" onClick={handleLogOut}>
+                    <Button
+                      className="mt-4 w-full bg-red-500 hover:bg-red-600 text-white"
+                      onClick={handleLogOut}
+                    >
                       Log Out
                     </Button>
                   </PopoverContent>
@@ -267,7 +280,7 @@ const Header: React.FC = () => {
             </a>
             <Cartpopup />
 
-            {!isLogin ? (
+            {!isAuthenticated ? (
               <Dialog open={authOpen} onOpenChange={setAuthOpen}>
                 <DialogTrigger asChild>
                   <button

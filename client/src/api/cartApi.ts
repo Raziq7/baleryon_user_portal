@@ -9,7 +9,7 @@ interface ApiErrorResponse {
 // | Add to Cart
 export const addToCartData = async (cartData: CartData) => {
   try {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("auth_token");
     console.log(token, "slkdjfalskjhdfaklsjdhfsldh");
 
     if (!token) {
@@ -40,7 +40,7 @@ export const addToCartData = async (cartData: CartData) => {
 
 // | Fetch Cart
 export const fetchCartData = async (): Promise<CartResponse | undefined> => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token");
   if (!token) {
     console.warn("User is not logged in.");
     return;
@@ -63,7 +63,7 @@ export const fetchCartData = async (): Promise<CartResponse | undefined> => {
 
 // | Remove from Cart
 export const removeFromCartData = async (cartId: string): Promise<void> => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token");
   if (!token) {
     console.warn("User is not logged in.");
     return;
@@ -109,7 +109,7 @@ export const updateCartItemData = async (
 
 // | Clear Cart
 export const clearCartData = async (): Promise<void> => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token");
   if (!token) {
     console.warn("User is not logged in.");
     return;

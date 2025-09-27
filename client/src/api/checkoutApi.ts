@@ -17,7 +17,7 @@ interface items {
   price: number;
 }
 
-const token = localStorage.getItem("token");
+const token = localStorage.getItem("auth_token");
 export const getCheckout = async (
   amount: number,
   currency: string = "INR",
@@ -44,7 +44,7 @@ export const getCheckout = async (
 
 // /api/user/oraderPaymentUpdate
 export const oraderPaymentUpdate = async (orderId: string, status: string) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token");
   const response = await api.put(
     "/api/user/order/orderPaymentUpdate",
     { orderId, status },
@@ -59,7 +59,7 @@ export const oraderPaymentUpdate = async (orderId: string, status: string) => {
 };
 
 export const listAddress = async () => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token");
   if (!token) {
     throw new Error("Token not found");
   }
@@ -73,7 +73,7 @@ export const listAddress = async () => {
 };
 
 export const allOrderList = async () => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token");
   if (!token) {
     throw new Error("Token not found");
   }

@@ -15,8 +15,8 @@ export const addToCartThunk = createAsyncThunk<
   CartData,
   { rejectValue: string }
 >("cart/addToCart", async (cartData, { rejectWithValue }) => {
-  const token = localStorage.getItem("token");
-  if (!token) return rejectWithValue("AUTH_REQUIRED"); // <— UI can check this
+  const token = localStorage.getItem("auth_token");
+  if (!token) return rejectWithValue("AUTH_REQUIRED");
 
   try {
     const response = await addToCartData(cartData);
@@ -41,7 +41,7 @@ export const fetchCartItemsThunk = createAsyncThunk<
   void,
   { rejectValue: string }
 >("cart/fetchCartItems", async (_, { rejectWithValue }) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token");
   if (!token) return rejectWithValue("User is not logged in");
 
   try {
@@ -65,7 +65,7 @@ export const updateCartQuantityThunk = createAsyncThunk<
   updateCartQuantity,
   { rejectValue: string }
 >("cart/updateCartQuantity", async (payload, { rejectWithValue }) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token");
   if (!token) return rejectWithValue("Missing token");
 
   try {
@@ -105,7 +105,7 @@ export const removeFromCartThunk = createAsyncThunk<
   string,
   { rejectValue: string }
 >("cart/removeFromCart", async (cartId, { rejectWithValue, dispatch }) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("auth_token");
   if (!token) return rejectWithValue("Missing token");
 
   try {

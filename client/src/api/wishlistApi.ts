@@ -3,7 +3,7 @@ import api from "../utils/baseUrl"; // Adjust path as needed
 
 // Get token safely (recommended to fetch inside a function, not top-level)
 const getToken = (): string | null => {
-  return localStorage.getItem("token");
+  return localStorage.getItem("auth_token");
 };
 
 export const getWishlist = async () => {

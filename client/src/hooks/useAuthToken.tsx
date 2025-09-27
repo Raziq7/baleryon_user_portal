@@ -9,12 +9,12 @@ const useAuthToken = () => {
   // initial from localStorage (for page refresh before Redux rehydrates)
   const [isLogin, setIsLogin] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
-    return !!localStorage.getItem("token");
+    return !!localStorage.getItem("auth_token");
   });
 
   // React to Redux state changes
   useEffect(() => {
-    setIsLogin(isAuthenticated || !!token || !!localStorage.getItem("token"));
+    setIsLogin(isAuthenticated || !!token || !!localStorage.getItem("auth_token"));
   }, [isAuthenticated, token]);
 
   // React to token changes from other tabs / code paths

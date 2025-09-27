@@ -15,26 +15,36 @@ import {
   verifyOtp,
   logoutUser,
 } from "../../api/authApi";
+import { clearAuth } from "../../utils/authToken";
 
 // Signup (request OTP)
 // In the thunk
 export const signupUserThunk = createAsyncThunk<
-  SignUpResponse & { pendingEmail: string }, // extend with what you need
+  SignUpResponse & { pendingEmail: string },
   SignUpRequest,
   { rejectValue: string }
 >("auth/signup", async (userData, { rejectWithValue }) => {
   try {
     const response = await signupUser(userData);
-    return { ...response, pendingEmail: response.user.email ?? userData.email };
+    // response may be either axios.data or a plain object; handle both safely
+    const data: any =
+      response && (response as any).data ? (response as any).data : response;
+
+    const emailFromResponse =
+      data?.user?.email ?? data?.email ?? userData.email; // final fallback: what the user typed
+
+    return {
+      ...(data ?? {}), // preserve message or any other fields
+      pendingEmail: emailFromResponse,
+    };
   } catch (error) {
+    console.log(error, "errorerrorerrorerrorerrorerror");
     if (axios.isAxiosError(error)) {
       return rejectWithValue(error.response?.data?.message || "Signup failed");
     }
     return rejectWithValue("An unexpected error occurred");
   }
 });
-
-
 
 // Login
 export const loginUserThunk = createAsyncThunk<
@@ -65,7 +75,15 @@ export const verifyOtpThunk = createAsyncThunk<
     { rejectWithValue }
   ) => {
     try {
-      const response = await verifyOtp(email, otp, firstName, lastName, phone, password, gender);
+      const response = await verifyOtp(
+        email,
+        otp,
+        firstName,
+        lastName,
+        phone,
+        password,
+        gender
+      );
       return response;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -85,12 +103,15 @@ export const logoutUserThunk = createAsyncThunk<
   { rejectValue: string }
 >("auth/logout", async (_, { rejectWithValue }) => {
   try {
+    // Call server (but don't block UI on failure)
     await logoutUser();
-    // local cleanup is also done in slice on fulfilled
   } catch (error) {
+    // swallow server errors; still clear local state so UI updates immediately
     if (axios.isAxiosError(error)) {
-      return rejectWithValue(error.response?.data?.message || "Logout failed");
+      // optional: return rejectWithValue(...) if you want a toast
     }
-    return rejectWithValue("An unexpected error occurred");
+  } finally {
+    // Always clear local side
+    clearAuth(); // removes token & user from localStorage
   }
 });
