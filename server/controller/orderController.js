@@ -142,7 +142,7 @@ export const fetchAddressController = asyncHandler(async (req, res) => {
     }
 });
 
-// ✅ Update Order Payment Status (PUT)
+//  Update Order Payment Status (PUT)
 // @desc    Update Order Payment Status
 // @route   PUT /api/user/oraderPaymentUpdate
 // @access  Private (Authenticated users only)
@@ -166,12 +166,12 @@ console.log(orderId, "orderIdorderIdorderIdorderIdorderIdorderIdorderIdorderIdor
 
     await order.save();
 
-    // ✅ Remove Purchased Items from Cart
+    //  Remove Purchased Items from Cart
     if (status === "paid") {
         const cart = await Cart.findOne({ userId: order.userId });
 
         if (cart && cart.items.length > 0) {
-            // ✅ Ensure `cart.items` exist before filtering
+            //  Ensure `cart.items` exist before filtering
             console.log(cart, "cartcartcartcartcartcartcartcart");
 
             cart.items = cart.items.filter(cartItem =>
@@ -185,7 +185,7 @@ console.log(orderId, "orderIdorderIdorderIdorderIdorderIdorderIdorderIdorderIdor
     res.status(200).json({ message: "Order payment status updated successfully", order });
 });
 
-// ✅ Mark Order as Delivered (PUT)
+//  Mark Order as Delivered (PUT)
 // @desc    Update Order Payment Status
 // @route   PUT /api/user/deliveryUpdate
 // @access  Private (Authenticated users only)

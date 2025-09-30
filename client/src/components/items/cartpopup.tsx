@@ -1,12 +1,21 @@
-import React, { useEffect } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
+import React, { useEffect, useState } from "react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../../components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import { Badge } from "../../components/ui/badge";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch } from "../../store/store";
 import { Button } from "../../components/ui/button";
 import { Trash2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   clearCartThunk,
   fetchCartItemsThunk,
@@ -34,24 +43,37 @@ export interface CartProduct {
 
 function Cartpopup() {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const { items, userId } = useSelector((state: RootState) => state.cart);
   const subtotal = useSelector(selectSubtotal);
+
+  // Controlled popover state
+  const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
     dispatch(fetchCartItemsThunk());
   }, [dispatch]);
+
+  // Close cart when route changes
+  useEffect(() => {
+    setCartOpen(false);
+  }, [location.pathname]);
 
   const handleQuantityChange = (userId: string, item: CartProduct, increase: boolean) => {
     const productId = item.productId?._id || item._id;
     const newQuantity = increase ? item.quantity + 1 : item.quantity - 1;
     if (newQuantity < 1) return;
 
-    dispatch(updateCartQuantityThunk({
-      userId,
-      cartId: item._id,
-      productId,
-      quantity: newQuantity,
-    }));
+    dispatch(
+      updateCartQuantityThunk({
+        userId,
+        cartId: item._id,
+        productId,
+        quantity: newQuantity,
+      })
+    );
   };
 
   const removeProductFromCart = (cartId: string) => {
@@ -62,8 +84,14 @@ function Cartpopup() {
     dispatch(clearCartThunk());
   };
 
+  // Explicit close + navigate on Checkout (prevents popover lingering)
+  const handleCheckout = () => {
+    setCartOpen(false);
+    navigate("/checkout");
+  };
+
   return (
-    <Popover>
+    <Popover open={cartOpen} onOpenChange={setCartOpen}>
       <PopoverTrigger className="relative">
         {items?.length > 0 && (
           <Badge
@@ -92,12 +120,8 @@ function Cartpopup() {
               height={250}
               className="mx-auto"
             />
-            <h2 className="text-xl font-bold mt-2">
-              Your Shopping Bag is Empty
-            </h2>
-            <p className="text-gray-500 mt-1">
-              Add items to make magic happen!
-            </p>
+            <h2 className="text-xl font-bold mt-2">Your Shopping Bag is Empty</h2>
+            <p className="text-gray-500 mt-1">Add items to make magic happen!</p>
           </div>
         ) : (
           <div className="w-full max-w-md">
@@ -148,29 +172,20 @@ function Cartpopup() {
                           <div className="flex items-center space-x-2">
                             <button
                               className="w-6 h-6 border rounded-full flex justify-center items-center"
-                              onClick={() =>
-                                userId &&
-                                handleQuantityChange(userId, item, false)
-                              }
+                              onClick={() => userId && handleQuantityChange(userId, item, false)}
                             >
                               -
                             </button>
                             <span>{item.quantity}</span>
                             <button
                               className="w-6 h-6 border rounded-full flex justify-center items-center"
-                              onClick={() =>
-                                userId &&
-                                handleQuantityChange(userId, item, true)
-                              }
+                              onClick={() => userId && handleQuantityChange(userId, item, true)}
                             >
                               +
                             </button>
                           </div>
                           <span className="font-medium">
-                            ₹{" "}
-                            {new Intl.NumberFormat("en-IN").format(
-                              item?.productId?.price
-                            )}
+                            ₹ {new Intl.NumberFormat("en-IN").format(item?.productId?.price)}
                           </span>
                         </div>
                       </div>
@@ -188,18 +203,18 @@ function Cartpopup() {
                 </span>
               </div>
               <div className="flex gap-2.5">
-                <Link to="/checkout" className="w-full">
-                  <button className="w-full bg-black text-white py-2 rounded hover:bg-gray-800">
-                    Checkout
-                  </button>
-                </Link>
+                {/* Button instead of Link to ensure we close popover before navigating */}
+                <button
+                  onClick={handleCheckout}
+                  className="w-full bg-black text-white py-2 rounded hover:bg-gray-800"
+                >
+                  Checkout
+                </button>
+
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        onClick={removeAllProductFromCart}
-                      >
+                      <Button variant="outline" onClick={removeAllProductFromCart}>
                         <Trash2 />
                       </Button>
                     </TooltipTrigger>
@@ -208,6 +223,13 @@ function Cartpopup() {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+              </div>
+
+              {/* (Optional) Keep a link to continue shopping */}
+              <div className="text-right mt-2">
+                <Link to="/products" onClick={() => setCartOpen(false)} className="text-sm underline">
+                  Continue shopping
+                </Link>
               </div>
             </div>
           </div>

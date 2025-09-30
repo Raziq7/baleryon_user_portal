@@ -13,7 +13,7 @@ import About from "./app/about-us/page";
 import Footer from "./components/layout/footer";
 import ContactUsPage from "./app/contact-us/page";
 import ProductDetailsClient from "./app/products/product-details/ProductDetailsClient";
-import WishlistPage from "./app/mywishlist/page";
+import WishlistPage from "./app/mywishlist/Mywishlist";
 import CheckoutPage from "./app/checkout/page";
 import Privacy from "./app/privacy-policy/page";
 import TermsCondition from "./app/terms-condition/page";

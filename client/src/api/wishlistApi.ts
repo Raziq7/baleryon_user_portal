@@ -1,10 +1,7 @@
 import type { ProductSize } from "../store/types/product";
-import api from "../utils/baseUrl"; // Adjust path as needed
+import api from "../utils/baseUrl";
 
-// Get token safely (recommended to fetch inside a function, not top-level)
-const getToken = (): string | null => {
-  return localStorage.getItem("auth_token");
-};
+const getToken = (): string | null => localStorage.getItem("auth_token");
 
 export const getWishlist = async () => {
   const token = getToken();
@@ -25,11 +22,7 @@ export const addToWishlist = async (
   const token = getToken();
   const response = await api.post(
     "/api/user/wishlist/",
-    {
-      productId,
-      size,
-      color,
-    },
+    { productId, size, color },
     {
       headers: {
         Authorization: `Bearer ${token}`,

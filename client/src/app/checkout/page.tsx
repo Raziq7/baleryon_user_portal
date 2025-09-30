@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { Locate } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
+import { toast } from "react-hot-toast";
 
 import { Button } from "../../components/ui/button";
 import {
@@ -57,7 +58,7 @@ type Address = {
   state: string;
   zip: string;
   number: string;
-  id: string;
+  id: string; // existing address id (when chosen)
 };
 
 interface RazorpayPaymentResponse {
@@ -99,9 +100,14 @@ const CheckoutPage: React.FC = () => {
   const { items } = useSelector((state: RootState) => state.cart);
 
   const [isClient, setIsClient] = useState(false);
-  const [deliveryMethod, setDeliveryMethod] = useState("0");
-  const [couponCode, setCouponCode] = useState("");
+
+  // Addresses
   const [addressList, setAddressList] = useState<AddressInterface[]>([]);
+  const [selectedExistingIndex, setSelectedExistingIndex] =
+    useState<string>("0"); // for RadioGroup
+  const [showAddressForm, setShowAddressForm] = useState(false);
+
+  // Unified address state (used for both existing and new)
   const [address, setAddress] = useState<Address>({
     name: "",
     street: "",
@@ -111,37 +117,47 @@ const CheckoutPage: React.FC = () => {
     number: "",
     id: "",
   });
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
+  // UI states
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+
+  // Pricing (example)
   const delivery = 16.99;
   const tax = 12.99;
 
-  // product discount
+  // Discount sum
   const totalDiscount = items.reduce((acc, item) => {
     const discount =
-      typeof item.productId === "object" && item.productId.discount
-        ? item.productId.discount
+      typeof item.productId === "object" && (item.productId as any).discount
+        ? (item.productId as any).discount
         : 0;
     return acc + discount;
   }, 0);
 
-  // product total
+  // Subtotal
   const subtotal = items.reduce((acc, item) => {
     const price =
       typeof item.productId === "object"
-        ? item.productId.price
+        ? (item.productId as any).price
         : item.price || 0;
     return acc + price * item.quantity;
   }, 0);
+
   const totalBeforeTax = subtotal + delivery - totalDiscount;
   const orderTotal = totalBeforeTax + tax;
 
-  const stripePromise = loadStripe("pk_test_..."); // your Stripe publishable key
+  // Stripe key (unused in this flow but kept if you mix gateways)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const stripePromise = loadStripe("pk_test_...");
 
-  const handleAddressSubmit = (e: string) => {
-    setDeliveryMethod(e);
-    const selected = addressList[parseInt(e)];
+  // ----- Address helpers -----
+  const hydrateAddressFromExisting = (indexStr: string) => {
+    const idx = parseInt(indexStr, 10);
+    const selected = addressList[idx];
+    if (!selected) return;
+
     setAddress({
       name: selected.name,
       street: selected.street,
@@ -149,10 +165,17 @@ const CheckoutPage: React.FC = () => {
       state: selected.state,
       zip: selected.zip,
       number: selected.number,
-      id: selected._id,
+      id: selected._id, // crucial: carry the id so backend knows it's existing
     });
   };
 
+  // When user selects an existing address radio
+  const handleExistingAddressSelect = (indexStr: string) => {
+    setSelectedExistingIndex(indexStr);
+    hydrateAddressFromExisting(indexStr);
+  };
+
+  // Load Razorpay
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
       if (window.Razorpay) {
@@ -167,103 +190,148 @@ const CheckoutPage: React.FC = () => {
     });
   };
 
+  // ----- Submit handler -----
   const handleSubmit = async () => {
-    if (
-      !address.name ||
-      !address.street ||
-      !address.city ||
-      !address.state ||
-      !address.zip ||
-      !address.number
-    ) {
-      setFormError("Please complete the address form before continuing.");
-      return;
-    }
-
+    // Validation: items present
     if (!items || items.length === 0) {
-      setFormError("Your cart is empty. Please add items before checking out.");
+      toast.error("Your cart is empty. Please add items before checking out.");
       return;
     }
 
-    setFormError(null);
-    const prodList = items.map((item) => {
-      const product =
-        typeof item.productId === "object" ? item.productId : null;
-      return {
-        productId: product?._id || item._id,
-        size: item.size,
-        color: item.color,
-        quantity: item.quantity,
-        price: product?.price || item.price || 0,
+    // Validation: address fields
+    // If using existing address: we expect address.id set + other fields present
+    // If adding new: address.id should be "", but all fields must be filled.
+    const requiredFields = [
+      "name",
+      "street",
+      "city",
+      "state",
+      "zip",
+      "number",
+    ] as const;
+    const missing = requiredFields.filter((k) => !address[k]);
+    if (missing.length > 0) {
+      toast.error("Please complete the address details before continuing.");
+      return;
+    }
+
+    try {
+      setProcessing(true);
+
+      const prodList = items.map((item) => {
+        const product =
+          typeof item.productId === "object" ? (item.productId as any) : null;
+        return {
+          productId: product?._id || item._id,
+          size: (item as any).size,
+          color: (item as any).color,
+          quantity: item.quantity,
+          price: product?.price || item.price || 0,
+        };
+      });
+
+      // Create order + get Razorpay order (controller will:
+      // - Use address.id if present (existing), else create new address
+      // - Create db Order with address ref
+      const res = await getCheckout(totalBeforeTax, "INR", address, prodList);
+
+      // Load Razorpay SDK
+      const isRazorpayLoaded = await loadRazorpayScript();
+      if (!isRazorpayLoaded) {
+        toast.error("Failed to load Razorpay. Please try again.");
+        setProcessing(false);
+        return;
+      }
+
+      const options: RazorpayOptions = {
+        key: "rzp_test_6gXYpAz9Ijk31I",
+        amount: res.amount,
+        currency: "INR",
+        name: "The Baleryon",
+        description: "Thank you for shopping with us!",
+        order_id: res.id,
+        handler: async function () {
+          // Success
+          try {
+            await oraderPaymentUpdate(res.id, "paid");
+            setDialogOpen(true);
+            toast.success("Payment successful!");
+            setTimeout(() => {
+              setDialogOpen(false);
+              navigate("/orderList");
+            }, 1800);
+          } catch (e) {
+            toast.error(
+              "Payment captured, but updating order failed. We'll fix this shortly."
+            );
+          } finally {
+            setProcessing(false);
+          }
+        },
+        prefill: {
+          name: address.name,
+          email: address.number, // you might want to change this to a real email
+        },
+        theme: {
+          color: "#F37254",
+        },
       };
-    });
 
-    const res = await getCheckout(totalBeforeTax, "INR", address, prodList);
-
-    // Load Razorpay SDK
-    const isRazorpayLoaded = await loadRazorpayScript();
-    if (!isRazorpayLoaded) {
-      alert("Failed to load Razorpay SDK. Please try again later.");
-      return;
-    }
-
-    const options: RazorpayOptions = {
-      key: "rzp_test_6gXYpAz9Ijk31I",
-      amount: res.amount,
-      currency: "INR",
-      name: "The Baleryon",
-      description: "Thank you for shopping with us!",
-      order_id: res.id,
-      handler: async function () {
-        setDialogOpen(true);
-        await oraderPaymentUpdate(res.id, "paid");
-        setTimeout(() => {
-          setDialogOpen(false);
-          navigate("/orderList");
-        }, 2000);
-      },
-      prefill: {
-        name: address.name,
-        email: address.number,
-      },
-      theme: {
-        color: "#F37254",
-      },
-    };
-
-    if (window.Razorpay) {
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
-    } else {
-      console.error("Razorpay SDK not loaded");
+      if (window.Razorpay) {
+        const razorpay = new window.Razorpay(options);
+        razorpay.open();
+      } else {
+        toast.error("Razorpay SDK is not available.");
+        setProcessing(false);
+      }
+    } catch (error: any) {
+      console.error(error);
+      toast.error(
+        error?.message || "Failed to initiate payment. Please try again."
+      );
+      setProcessing(false);
     }
   };
 
+  // ----- Data loading -----
   const fetchAddressList = async () => {
     try {
       const res = await listAddress();
-      setAddressList(res);
-      const first = res[0];
-      setAddress({
-        name: first.name,
-        street: first.street,
-        city: first.city,
-        state: first.state,
-        zip: first.zip,
-        number: first.number,
-        id: first._id,
-      });
+      setAddressList(res || []);
+
+      if (res && res.length > 0) {
+        // Default to first address and hide the form
+        setShowAddressForm(false);
+        setSelectedExistingIndex("0");
+        hydrateAddressFromExisting("0");
+      } else {
+        // No existing address -> show form by default (no id)
+        setShowAddressForm(true);
+        setAddress({
+          name: "",
+          street: "",
+          city: "",
+          state: "",
+          zip: "",
+          number: "",
+          id: "",
+        });
+      }
     } catch (error) {
       console.error("Error fetching addresses:", error);
+      // Degrade gracefully: show form if we can't fetch
+      setShowAddressForm(true);
     }
   };
 
   const removeProductFromCart = async (productId: string) => {
     try {
       await removeFromCartData(productId);
-      dispatch(fetchCartItemsThunk());
+      await dispatch(fetchCartItemsThunk());
+      toast.success("Removed from cart");
     } catch (error) {
       console.error("Error removing product from cart:", error);
+      toast.error("Failed to remove item");
     }
   };
 
@@ -271,6 +339,7 @@ const CheckoutPage: React.FC = () => {
     setIsClient(true);
     fetchAddressList();
     dispatch(fetchCartItemsThunk());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!isClient) return null;
@@ -278,112 +347,157 @@ const CheckoutPage: React.FC = () => {
   return (
     <>
       <div className="container mx-auto py-6 px-4 md:px-6 max-w-7xl">
-        {formError && (
-          <div className="text-red-600 bg-red-100 border border-red-200 px-3 py-2 rounded-md text-sm mt-2">
-            {formError}
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left: Addresses */}
           <div className="lg:col-span-2">
-            <h3 className="text-lg font-medium mb-4">Shipping address</h3>
-            <div className="mb-8">
-              <RadioGroup
-                value={deliveryMethod}
-                onValueChange={handleAddressSubmit}
-                className="space-y-3"
-              >
-                {addressList.map((e, i) => (
-                  <div
-                    key={e._id}
-                    className={cn(
-                      "flex items-center rounded-md border p-4",
-                      deliveryMethod === i.toString()
-                        ? "border-primary"
-                        : "border-input"
-                    )}
-                  >
-                    <RadioGroupItem
-                      value={i.toString()}
-                      id={i.toString()}
-                      className="mr-4"
-                    />
-                    <div className="flex items-center gap-3 flex-1">
-                      <Locate size={18} className="text-muted-foreground" />
-                      <Label
-                        htmlFor={i.toString()}
-                        className="flex-1 cursor-pointer"
-                      >
-                        {e.name}, {e.street}, {e.city}, {e.state} {e.zip}
-                      </Label>
-                    </div>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
+            <h3 className="text-lg font-medium mb-4">Shipping Address</h3>
 
-            <div className="mb-8">
-              <AddressForm address={address} setAddress={setAddress} />
-            </div>
+            {/* Existing addresses selector (only if we have at least one) */}
+            {addressList.length > 0 && !showAddressForm && (
+              <div className="mb-6">
+                <RadioGroup
+                  value={selectedExistingIndex}
+                  onValueChange={handleExistingAddressSelect}
+                  className="space-y-3"
+                >
+                  {addressList.map((addr, i) => (
+                    <div
+                      key={addr._id}
+                      className={cn(
+                        "flex items-center rounded-md border p-4",
+                        selectedExistingIndex === i.toString()
+                          ? "border-primary"
+                          : "border-input"
+                      )}
+                    >
+                      <RadioGroupItem
+                        value={i.toString()}
+                        id={`addr_${i}`}
+                        className="mr-4"
+                      />
+                      <div className="flex items-center gap-3 flex-1">
+                        <Locate size={18} className="text-muted-foreground" />
+                        <Label
+                          htmlFor={`addr_${i}`}
+                          className="flex-1 cursor-pointer"
+                        >
+                          {addr.name}, {addr.street}, {addr.city}, {addr.state}{" "}
+                          {addr.zip}
+                          <span className="block text-xs text-muted-foreground">
+                            Phone/Email: {addr.number}
+                          </span>
+                        </Label>
+                      </div>
+                    </div>
+                  ))}
+                </RadioGroup>
+
+                <div className="mt-4 flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAddressForm(true)}
+                  >
+                    Add another address
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Address form (shown if no existing or toggled to add new) */}
+            {showAddressForm && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium">Add New Address</h4>
+                  {addressList.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setShowAddressForm(false);
+                        // Reset to first existing after cancel
+                        if (addressList.length > 0) {
+                          setSelectedExistingIndex("0");
+                          hydrateAddressFromExisting("0");
+                        }
+                      }}
+                    >
+                      Use existing instead
+                    </Button>
+                  )}
+                </div>
+
+                {/* IMPORTANT: ensure AddressForm does NOT set id (new address) */}
+                <AddressForm
+                  address={{ ...address, id: "" }} // ensure blank id for "create new"
+                  setAddress={(updater) =>
+                    setAddress((prev) => {
+                      const next =
+                        typeof updater === "function"
+                          ? (updater as (p: Address) => Address)(prev)
+                          : updater;
+                      return { ...next, id: "" }; // keep id blank on new-address path
+                    })
+                  }
+                />
+              </div>
+            )}
           </div>
 
+          {/* Right: Order summary */}
           <div>
             <Card className="sticky top-6">
               <CardHeader className="pb-3">
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                {items?.map((item) => (
-                  <div key={item._id} className="flex justify-between mb-2">
-                    <div className="flex items-start">
-                      <span className="text-sm text-muted-foreground mr-2">
-                        x {item.quantity}
-                      </span>
-                      <span className="text-sm">
-                        {typeof item.productId === "object"
-                          ? item.productId.productName
-                          : item.productName}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        ₹{" "}
-                        {typeof item.productId === "object"
-                          ? item.productId.price * item.quantity
-                          : item.price * item.quantity}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() =>
-                          removeProductFromCart(
-                            typeof item.productId === "object"
-                              ? item.productId._id
-                              : item._id
-                          )
-                        }
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="text-muted-foreground"
+                {items?.map((item) => {
+                  const product =
+                    typeof item.productId === "object"
+                      ? (item.productId as any)
+                      : null;
+                  const priceEach = product?.price ?? item.price ?? 0;
+                  return (
+                    <div key={item._id} className="flex justify-between mb-2">
+                      <div className="flex items-start">
+                        <span className="text-sm text-muted-foreground mr-2">
+                          x {item.quantity}
+                        </span>
+                        <span className="text-sm">
+                          {product ? product.productName : item.productName}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          ₹ {priceEach * item.quantity}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() =>
+                            removeProductFromCart(product?._id || item._id)
+                          }
                         >
-                          <path d="M3 6h18" />
-                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                        </svg>
-                      </Button>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="text-muted-foreground"
+                          >
+                            <path d="M3 6h18" />
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                          </svg>
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <Separator className="my-4" />
 
@@ -423,10 +537,28 @@ const CheckoutPage: React.FC = () => {
                       className="pl-10"
                     />
                   </div>
-                  <Button variant="outline">Apply</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!couponCode.trim()) {
+                        toast.error("Enter a coupon code");
+                        return;
+                      }
+                      toast.success("Coupon applied"); // wire to real API if needed
+                    }}
+                  >
+                    Apply
+                  </Button>
                 </div>
-                <Button className="bg-black mt-4 w-full" onClick={handleSubmit}>
-                  Confirm Payment ₹ {totalBeforeTax.toFixed(2)}
+
+                <Button
+                  className="bg-black mt-4 w-full"
+                  onClick={handleSubmit}
+                  disabled={processing}
+                >
+                  {processing
+                    ? "Processing..."
+                    : `Confirm Payment ₹ ${totalBeforeTax.toFixed(2)}`}
                 </Button>
               </CardContent>
             </Card>
@@ -434,6 +566,7 @@ const CheckoutPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Success modal */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

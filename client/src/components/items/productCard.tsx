@@ -1,27 +1,96 @@
-import React, { useEffect, useState } from "react";
+// src/components/items/ProductCard.tsx
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { ProductDetail } from "../../store/types/product";
-import { useDispatch, useSelector } from "react-redux";
 import { Heart, Trash } from "lucide-react";
-import type { RootState } from "../../store/store";
+import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-hot-toast";
+
+import type { ProductDetail } from "../../store/types/product";
+import type { AppDispatch } from "../../store/store";
+
 import {
-  toggleWishlistItem,
-  initializeWishlist,
+  fetchWishlistThunk,
+  initializeWishlistFromLocal,
+  selectWishlistIdSet,
+  selectWishlistInitialized,
+  addToWishlistThunk,
+  removeFromWishlistThunk,
 } from "../../store/slices/wishlistSlice";
-import { addToWishlist } from "../../api/wishlistApi";
 
-interface ProductCardProps {
-  prodctname: string;
-  prodctID: string;
-  price: number;
-  image: string;
-  productDetail: ProductDetail;
-}
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import LoginForm from "../../components/items/loginForm";
 
+/* ---------- helpers ---------- */
 const formatINR = (n?: number) =>
   typeof n === "number"
     ? new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n)
     : "0";
+
+/** Auth modal + pending action */
+function useAuthModalWithPendingAction() {
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const isLoggedIn = useMemo(() => !!localStorage.getItem("auth_token"), []);
+  const [pendingAction, setPendingAction] = useState<null | (() => void)>(null);
+
+  const openLogin = (action?: () => void) => {
+    if (action) setPendingAction(() => action);
+    setAuthMode("login");
+    setShowAuthModal(true);
+  };
+
+  const handleLoginSuccess = () => {
+    setShowAuthModal(false);
+    setTimeout(() => {
+      if (pendingAction) {
+        const act = pendingAction;
+        setPendingAction(null);
+        act();
+      }
+    }, 50);
+  };
+
+  return {
+    isLoggedIn,
+    showAuthModal,
+    authMode,
+    setAuthMode,
+    setShowAuthModal,
+    openLogin,
+    handleLoginSuccess,
+  };
+}
+
+/** Heart that reliably fills when active */
+const WishHeart: React.FC<{ active: boolean }> = ({ active }) => {
+  const color = active ? "#ef4444" /* red-500 */ : "#111827" /* gray-900 */;
+  return (
+    <Heart
+      style={{ color }}
+      fill={active ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={2.25}
+      className="h-5 w-5"
+    />
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* ProductCard                                                                */
+/* -------------------------------------------------------------------------- */
+interface ProductCardProps {
+  prodctname: string;
+  prodctID?: string; // optional, prefer productDetail._id
+  price: number;
+  image: string;
+  productDetail: ProductDetail; // MUST contain _id
+}
 
 export const ProductCard: React.FC<ProductCardProps> = ({
   prodctname,
@@ -31,83 +100,145 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   productDetail,
 }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+
+  const hasToken = !!localStorage.getItem("auth_token");
+  const initialized = useSelector(selectWishlistInitialized);
+  const wishlistIdSet = useSelector(selectWishlistIdSet);
+
+  // Prefer the server id from productDetail
+  const idToCheck = productDetail?._id || prodctID || "";
+  const isInWishlist = wishlistIdSet.has(idToCheck);
+
   const [imgErr, setImgErr] = useState(false);
 
-  const goToDetails = () => navigate(`/products/product-details/${prodctID}`);
+  useEffect(() => {
+    if (!initialized) {
+      if (hasToken) dispatch(fetchWishlistThunk());
+      else dispatch(initializeWishlistFromLocal());
+    }
+  }, [dispatch, hasToken, initialized]);
+
+  const {
+    isLoggedIn,
+    showAuthModal,
+    authMode,
+    setAuthMode,
+    setShowAuthModal,
+    openLogin,
+    handleLoginSuccess,
+  } = useAuthModalWithPendingAction();
+
+  const goToDetails = () => navigate(`/products/product-details/${idToCheck}`);
+
+  const doToggleWishlist = async () => {
+    try {
+      if (!idToCheck) return;
+      if (isInWishlist) {
+        await dispatch(removeFromWishlistThunk(idToCheck)).unwrap();
+        toast.success("Removed from wishlist");
+      } else {
+        await dispatch(
+          addToWishlistThunk({
+            productId: idToCheck,
+            sizes: productDetail.sizes,
+            color: productDetail.color,
+          })
+        ).unwrap();
+        toast.success("Added to wishlist");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Unable to update wishlist");
+    }
+  };
+
+  const onHeartClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isLoggedIn) return openLogin(doToggleWishlist);
+    void doToggleWishlist();
+  };
 
   return (
-    <div className="group w-full">
-      {/* Media */}
-      <div className="relative w-full rounded-xl overflow-hidden bg-gray-50">
-        {/* Keep a consistent tall ratio like the screenshot */}
-        <div className="w-full aspect-[3/4]">
-          <img
-            src={
-              !imgErr && image ? image : "/cardProductImage.png" /* fallback */
-            }
-            alt={prodctname}
-            loading="lazy"
-            onError={() => setImgErr(true)}
-            className="h-full w-full object-cover"
-          />
-        </div>
+    <>
+      <div className="group w-full">
+        <div className="relative w-full rounded-xl overflow-hidden bg-gray-50">
+          <div className="w-full aspect-[3/4]">
+            <img
+              src={!imgErr && image ? image : "/cardProductImage.png"}
+              alt={prodctname}
+              loading="lazy"
+              onError={() => setImgErr(true)}
+              className="h-full w-full object-cover"
+            />
+          </div>
 
-        {/* Top-right wishlist (visual only; wire up when ready) */}
-        <button
-          type="button"
-          aria-label="Add to wishlist"
-          className="absolute top-2 right-2 rounded-full bg-white/90 p-2 shadow-md backdrop-blur-sm transition hover:bg-white"
-        >
-          <Heart className="h-5 w-5" />
-        </button>
-
-        {/* Desktop/hover “View” bar */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
           <button
-            onClick={goToDetails}
-            className="pointer-events-auto w-full py-3 text-white bg-black/90 hover:bg-black"
+            type="button"
+            aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+            aria-pressed={isInWishlist}
+            onClick={onHeartClick}
+            className="absolute top-2 right-2 rounded-full bg-white/90 p-2 shadow-md backdrop-blur-sm transition hover:bg-white"
           >
-            View
+            <WishHeart active={isInWishlist} />
           </button>
+
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
+            <button
+              onClick={goToDetails}
+              className="pointer-events-auto w-full py-3 text-white bg-black/90 hover:bg-black"
+            >
+              View
+            </button>
+          </div>
         </div>
+
+        <div className="mt-2 flex items-start justify-between gap-2">
+          <p className="text-[13px] sm:text-[14px] leading-tight line-clamp-2">
+            {prodctname}
+          </p>
+          <p className="text-[13px] sm:text-[14px] font-medium whitespace-nowrap">
+            ₹ {formatINR(price)}
+          </p>
+        </div>
+
+        <button
+          onClick={goToDetails}
+          className="sm:hidden mt-2 w-full py-2 text-sm rounded-md border border-gray-900 text-gray-900 active:scale-[0.99]"
+        >
+          View
+        </button>
       </div>
 
-      {/* Meta */}
-      <div className="mt-2 flex items-start justify-between gap-2">
-        <p className="text-[13px] sm:text-[14px] leading-tight line-clamp-2">
-          {prodctname}
-        </p>
-        <p className="text-[13px] sm:text-[14px] font-medium whitespace-nowrap">
-          ₹ {formatINR(price)}
-        </p>
-      </div>
-
-      {/* Mobile CTA (since no hover) */}
-      <button
-        onClick={goToDetails}
-        className="sm:hidden mt-2 w-full py-2 text-sm rounded-md border border-gray-900 text-gray-900 active:scale-[0.99]"
-      >
-        View
-      </button>
-    </div>
+      <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
+        <DialogContent className="w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl">
+              {authMode === "login" ? "Login" : "Sign Up"}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogDescription>
+            <LoginForm
+              signupClick={() => setAuthMode("signup")}
+              onSuccess={handleLoginSuccess}
+            />
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
-// ------------- ProductCard2 Component -------------------
-
+/* -------------------------------------------------------------------------- */
+/* ProductCard2                                                               */
+/* -------------------------------------------------------------------------- */
 interface ProductCard2Props {
   prodctname: string;
-  prodctID: string;
+  prodctID?: string; // optional, prefer productDetail._id
   index: number;
   price: number;
   image?: string;
-  productDetail: ProductDetail;
+  productDetail: ProductDetail; // MUST contain _id
 }
-
-// const formatINR = (n?: number) =>
-//   typeof n === "number"
-//     ? new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n)
-//     : "0";
 
 export const ProductCard2: React.FC<ProductCard2Props> = ({
   prodctname,
@@ -116,203 +247,292 @@ export const ProductCard2: React.FC<ProductCard2Props> = ({
   image,
   productDetail,
 }) => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const wishlistItems = useSelector((s: RootState) => s.wishlist.items);
+
+  const hasToken = !!localStorage.getItem("auth_token");
+  const initialized = useSelector(selectWishlistInitialized);
+  const wishlistIdSet = useSelector(selectWishlistIdSet);
+
+  const idToCheck = productDetail?._id || prodctID || "";
+  const isInWishlist = wishlistIdSet.has(idToCheck);
 
   const [imgErr, setImgErr] = useState(false);
-  const isInWishlist = wishlistItems.some((item) => item._id === prodctID);
 
   useEffect(() => {
-    dispatch(initializeWishlist());
-  }, [dispatch]);
+    if (!initialized) {
+      if (hasToken) dispatch(fetchWishlistThunk());
+      else dispatch(initializeWishlistFromLocal());
+    }
+  }, [dispatch, hasToken, initialized]);
 
-  const handleWishlistToggle = () => {
-    dispatch(toggleWishlistItem(productDetail));
-    addToWishlist(productDetail._id, productDetail.sizes, productDetail.color);
+  const {
+    isLoggedIn,
+    showAuthModal,
+    authMode,
+    setAuthMode,
+    setShowAuthModal,
+    openLogin,
+    handleLoginSuccess,
+  } = useAuthModalWithPendingAction();
+
+  const doToggleWishlist = async () => {
+    try {
+      if (!idToCheck) return;
+      if (isInWishlist) {
+        await dispatch(removeFromWishlistThunk(idToCheck)).unwrap();
+        toast.success("Removed from wishlist");
+      } else {
+        await dispatch(
+          addToWishlistThunk({
+            productId: idToCheck,
+            sizes: productDetail.sizes,
+            color: productDetail.color,
+          })
+        ).unwrap();
+        toast.success("Added to wishlist");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Unable to update wishlist");
+    }
   };
 
-  const goToDetails = () => navigate(`/products/product-details/${prodctID}`);
+  const handleWishlistToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isLoggedIn) return openLogin(doToggleWishlist);
+    void doToggleWishlist();
+  };
+
+  const goToDetails = () => navigate(`/products/product-details/${idToCheck}`);
 
   return (
-    <div className="group w-full">
-      {/* Media */}
-      <div className="relative w-full rounded-xl overflow-hidden bg-gray-50">
-        {/* Fixed tall ratio so cards align */}
-        <div className="w-full aspect-[3/4]">
-          <img
-            src={!imgErr && image ? image : "/cardProductImage.png"}
-            alt={prodctname}
-            loading="lazy"
-            onError={() => setImgErr(true)}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-          />
-        </div>
+    <>
+      <div className="group w-full">
+        <div className="relative w-full rounded-xl overflow-hidden bg-gray-50">
+          <div className="w-full aspect-[3/4]">
+            <img
+              src={!imgErr && image ? image : "/cardProductImage.png"}
+              alt={prodctname}
+              loading="lazy"
+              onError={() => setImgErr(true)}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+            />
+          </div>
 
-        {/* Wishlist heart */}
-        <button
-          type="button"
-          onClick={handleWishlistToggle}
-          aria-label="Toggle Wishlist"
-          className="absolute top-2 right-2 rounded-full bg-white/90 p-2 shadow-md backdrop-blur-sm hover:bg-white"
-        >
-          {isInWishlist ? (
-            <Heart className="h-5 w-5" color="red" fill="red" />
-          ) : (
-            <Heart className="h-5 w-5" />
-          )}
-        </button>
-
-        {/* Desktop hover View bar */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
           <button
-            onClick={goToDetails}
-            className="pointer-events-auto w-full py-3 text-white bg-black/90 hover:bg-black"
+            type="button"
+            onClick={handleWishlistToggle}
+            aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+            aria-pressed={isInWishlist}
+            className="absolute top-2 right-2 rounded-full bg-white/90 p-2 shadow-md backdrop-blur-sm hover:bg-white"
           >
-            View
+            <WishHeart active={isInWishlist} />
           </button>
+
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
+            <button
+              onClick={goToDetails}
+              className="pointer-events-auto w-full py-3 text-white bg-black/90 hover:bg-black"
+            >
+              View
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Meta */}
-      <div className="mt-2 flex items-start justify-between gap-2">
-        <p
+        <div className="mt-2 flex items-start justify-between gap-2">
+          <p onClick={goToDetails} className="text-[13px] sm:text-[14px] leading-tight line-clamp-2 cursor-pointer">
+            {prodctname}
+          </p>
+          <p className="text-[13px] sm:text-[14px] font-medium whitespace-nowrap">₹ {formatINR(price)}</p>
+        </div>
+
+        <button
           onClick={goToDetails}
-          className="text-[13px] sm:text-[14px] leading-tight line-clamp-2 cursor-pointer"
+          className="sm:hidden mt-2 w-full py-2 text-sm rounded-md border border-gray-900 text-gray-900 active:scale-[0.99]"
         >
-          {prodctname}
-        </p>
-        <p className="text-[13px] sm:text-[14px] font-medium whitespace-nowrap">
-          ₹ {formatINR(price)}
-        </p>
+          View
+        </button>
       </div>
 
-      {/* Mobile CTA (no hover) */}
-      <button
-        onClick={goToDetails}
-        className="sm:hidden mt-2 w-full py-2 text-sm rounded-md border border-gray-900 text-gray-900 active:scale-[0.99]"
-      >
-        View
-      </button>
-    </div>
+      <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
+        <DialogContent className="w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl">
+              {authMode === "login" ? "Login" : "Sign Up"}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogDescription>
+            <LoginForm
+              signupClick={() => setAuthMode("signup")}
+              onSuccess={handleLoginSuccess}
+            />
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
-// ------------- ProductListCard Component -------------------
+/* -------------------------------------------------------------------------- */
+/* ProductListCard (list view that takes full ProductDetail)                  */
+/* -------------------------------------------------------------------------- */
 interface ProductListCardProps {
   productDetail: ProductDetail;
 }
 
-// const formatINR = (n?: number) =>
-//   typeof n === "number"
-//     ? new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n)
-//     : "0";
-
-export const ProductListCard: React.FC<ProductListCardProps> = ({
-  productDetail,
-}) => {
+export const ProductListCard: React.FC<ProductListCardProps> = ({ productDetail }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+
+  const hasToken = !!localStorage.getItem("auth_token");
+  const initialized = useSelector(selectWishlistInitialized);
+  const wishlistIdSet = useSelector(selectWishlistIdSet);
+
+  const idToCheck = productDetail._id || "";
+  const isInWishlist = wishlistIdSet.has(idToCheck);
+
   const [imgErr, setImgErr] = useState(false);
 
-  const goToDetails = () =>
-    navigate(`/products/product-details/${productDetail._id}`);
+  useEffect(() => {
+    if (!initialized) {
+      if (hasToken) dispatch(fetchWishlistThunk());
+      else dispatch(initializeWishlistFromLocal());
+    }
+  }, [dispatch, hasToken, initialized]);
+
+  const {
+    isLoggedIn,
+    showAuthModal,
+    authMode,
+    setAuthMode,
+    setShowAuthModal,
+    openLogin,
+    handleLoginSuccess,
+  } = useAuthModalWithPendingAction();
+
+  const doToggleWishlist = async () => {
+    try {
+      if (!idToCheck) return;
+      if (isInWishlist) {
+        await dispatch(removeFromWishlistThunk(idToCheck)).unwrap();
+        toast.success("Removed from wishlist");
+      } else {
+        await dispatch(
+          addToWishlistThunk({
+            productId: idToCheck,
+            sizes: productDetail.sizes,
+            color: productDetail.color,
+          })
+        ).unwrap();
+        toast.success("Added to wishlist");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Unable to update wishlist");
+    }
+  };
+
+  const onHeartClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isLoggedIn) return openLogin(doToggleWishlist);
+    void doToggleWishlist();
+  };
+
+  const goToDetails = () => navigate(`/products/product-details/${idToCheck}`);
 
   return (
-    <div className="group w-full">
-      {/* Media */}
-      <div className="relative w-full rounded-xl overflow-hidden bg-gray-50">
-        <div className="w-full aspect-[3/4]">
-          <img
-            src={
-              !imgErr && productDetail.image?.[0]
-                ? productDetail.image[0]
-                : "/cardProductImage.png"
-            }
-            alt={productDetail.productName}
-            loading="lazy"
-            onError={() => setImgErr(true)}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-          />
-        </div>
+    <>
+      <div className="group w-full">
+        <div className="relative w-full rounded-xl overflow-hidden bg-gray-50">
+          <div className="w-full aspect-[3/4]">
+            <img
+              src={!imgErr && productDetail.image?.[0] ? productDetail.image[0] : "/cardProductImage.png"}
+              alt={productDetail.productName}
+              loading="lazy"
+              onError={() => setImgErr(true)}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+            />
+          </div>
 
-        {/* (Optional) wishlist icon — hook up to your slice if needed */}
-        <button
-          type="button"
-          aria-label="Wishlist"
-          className="absolute top-2 right-2 rounded-full bg-white/90 p-2 shadow-md backdrop-blur-sm hover:bg-white"
-        >
-          <Heart className="h-5 w-5" />
-        </button>
-
-        {/* Desktop hover "View" strip */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
           <button
-            onClick={goToDetails}
-            className="pointer-events-auto w-full py-3 text-white bg-black/90 hover:bg-black"
+            type="button"
+            aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+            aria-pressed={isInWishlist}
+            onClick={onHeartClick}
+            className="absolute top-2 right-2 rounded-full bg-white/90 p-2 shadow-md backdrop-blur-sm hover:bg-white"
           >
-            View
+            <WishHeart active={isInWishlist} />
           </button>
+
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
+            <button
+              onClick={goToDetails}
+              className="pointer-events-auto w-full py-3 text-white bg-black/90 hover:bg-black"
+            >
+              View
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Meta */}
-      <div className="mt-2 flex items-start justify-between gap-2">
-        <p
+        <div className="mt-2 flex items-start justify-between gap-2">
+          <p onClick={goToDetails} className="text-[13px] sm:text-[14px] leading-tight line-clamp-2 cursor-pointer">
+            {productDetail.productName}
+          </p>
+          <p className="text-[13px] sm:text-[14px] font-medium whitespace-nowrap">₹ {formatINR(productDetail.price)}</p>
+        </div>
+
+        <button
           onClick={goToDetails}
-          className="text-[13px] sm:text-[14px] leading-tight line-clamp-2 cursor-pointer"
+          className="sm:hidden mt-2 w-full py-2 text-sm rounded-md border border-gray-900 text-gray-900 active:scale-[0.99]"
         >
-          {productDetail.productName}
-        </p>
-        <p className="text-[13px] sm:text-[14px] font-medium whitespace-nowrap">
-          ₹ {formatINR(productDetail.price)}
-        </p>
+          View
+        </button>
       </div>
 
-      {/* Mobile CTA */}
-      <button
-        onClick={goToDetails}
-        className="sm:hidden mt-2 w-full py-2 text-sm rounded-md border border-gray-900 text-gray-900 active:scale-[0.99]"
-      >
-        View
-      </button>
-    </div>
+      <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
+        <DialogContent className="w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl">
+              {authMode === "login" ? "Login" : "Sign Up"}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogDescription>
+            <LoginForm
+              signupClick={() => setAuthMode("signup")}
+              onSuccess={handleLoginSuccess}
+            />
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
-// ------------- WishListCard Component -------------------
-
+/* -------------------------------------------------------------------------- */
+/* WishListCard (wishlist page item)                                          */
+/* -------------------------------------------------------------------------- */
 interface WishListCardProps {
   productDetail: ProductDetail;
   removeProduct: () => void;
 }
 
-export const WishListCard: React.FC<WishListCardProps> = ({
-  productDetail,
-  removeProduct,
-}) => {
+export const WishListCard: React.FC<WishListCardProps> = ({ productDetail, removeProduct }) => {
   const navigate = useNavigate();
 
   return (
     <div className="shadow-lg rounded group">
       <div className="relative">
-        <button
-          className="absolute top-3 right-3"
-          onClick={removeProduct}
-          aria-label="Remove from wishlist"
-        >
+        <button className="absolute top-3 right-3" onClick={removeProduct} aria-label="Remove from wishlist">
           <Trash />
         </button>
         <img
-          src={productDetail.image[0]}
+          src={productDetail.image?.[0] || "/cardProductImage.png"}
           alt={productDetail.productName}
           className="w-full h-auto"
         />
         <div className="absolute bottom-0 w-full opacity-0 group-hover:opacity-100 transition">
           <button
             className="w-full py-4 bg-black text-white"
-            onClick={() =>
-              navigate(`/products/product-details/${productDetail._id}`)
-            }
+            onClick={() => navigate(`/products/product-details/${productDetail._id}`)}
           >
             View
           </button>
@@ -321,9 +541,12 @@ export const WishListCard: React.FC<WishListCardProps> = ({
       <div className="px-3 py-2">
         <div className="flex justify-between">
           <p>{productDetail.productName}</p>
-          <p>₹ {productDetail.price}</p>
+          <p>₹ {formatINR(productDetail.price)}</p>
         </div>
       </div>
     </div>
   );
 };
+
+/* ---------- named exports ---------- */
+// export { ProductCard, ProductCard2, ProductListCard, WishListCard };
