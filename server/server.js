@@ -15,6 +15,8 @@ import wishlistRouter from "./routes/wishlistRouter.js";
 import orderRouter from "./routes/orderRouter.js";
 import settingRouter from "./routes/settingRouter.js";
 import userProfileRouter from "./routes/userRoutes.js";
+import userCategoryRoutes from "./routes/userCategoryRoutes.js";
+
 import sanitizedConfig from "./config.js";
 
 dotenv.config();
@@ -69,6 +71,9 @@ app.use("/api/user/auth", authRouter);
 app.use("/api/user/cart/", cartRouter);
 app.use("/api/user/wishlist/", wishlistRouter);
 app.use("/api/user/order/", orderRouter);
+
+app.use("/api/user/category", userCategoryRoutes);
+
 
 // settigs
 app.use("/api/user/setting", settingRouter);

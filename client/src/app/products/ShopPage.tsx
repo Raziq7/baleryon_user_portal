@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -8,16 +8,58 @@ import {
 import { Checkbox } from "../../components/ui/checkbox";
 import { ProductListCard } from "../../components/items/productCard";
 import type { ProductDetail } from "../../store/types/product";
-import api from "../../utils/baseUrl";
+import { fetchProductsFiltered } from "../../api/productApi";
+import {
+  fetchPublicCategories,
+  type PublicCategory,
+} from "../../api/categoryApi";
 
 function ShopPage() {
   const [productList, setProductList] = useState<ProductDetail[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const toggleFilter = (
+  // dynamic categories (tree) & selected filters
+  const [catTree, setCatTree] = useState<PublicCategory[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]); // store slugs
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+
+  // price + sort
+  const [minPrice, setMinPrice] = useState<string>("");
+  const [maxPrice, setMaxPrice] = useState<string>("");
+  const [sort, setSort] = useState<"" | "price_asc" | "price_desc">("");
+
+  // ---- Fetch categories (public) ----
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const tree = await fetchPublicCategories();
+        if (alive) setCatTree(tree);
+      } catch {
+        // non-fatal
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // ---- Build a flat list (root + level-1 children) for filters ----
+  const flatCats = useMemo(() => {
+    const out: { slug: string; name: string }[] = [];
+    const pushNode = (n: PublicCategory) => {
+      out.push({ slug: n.slug, name: n.name });
+      (n.children ?? []).forEach((c) =>
+        out.push({ slug: c.slug, name: `— ${c.name}` })
+      );
+    };
+    catTree.forEach(pushNode);
+    return out;
+  }, [catTree]);
+
+  // ---- Toggle helpers ----
+  const toggleStrInArray = (
     value: string,
     setState: React.Dispatch<React.SetStateAction<string[]>>
   ) => {
@@ -26,25 +68,29 @@ function ShopPage() {
     );
   };
 
+  // ---- Fetch products whenever filters change ----
   useEffect(() => {
     let alive = true;
-    const fetchProductList = async () => {
+
+    const load = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const query = new URLSearchParams();
-        query.append("page", "1");
-        query.append("limit", "12");
-        if (selectedCategories.length) query.append("category", selectedCategories.join(","));
-        if (selectedColors.length) query.append("color", selectedColors.join(","));
+        const { products } = await fetchProductsFiltered({
+          page: 1,
+          limit: 12,
+          categories: selectedCategories,
+          colors: selectedColors,
+          minPrice: minPrice ? Number(minPrice) : undefined,
+          maxPrice: maxPrice ? Number(maxPrice) : undefined,
+          sort: sort || undefined,
+        });
 
-        const { data } = await api.get(`/api/user/product/getProducts?${query.toString()}`);
         if (!alive) return;
-
-        const items: ProductDetail[] = data?.products || [];
-        setProductList(items);
-        if (!items.length) setError("No products found for the selected filters.");
+        setProductList(products);
+        if (!products.length)
+          setError("No products found for the selected filters.");
       } catch (e) {
         if (!alive) return;
         setError("An error occurred while fetching the products.");
@@ -53,22 +99,25 @@ function ShopPage() {
       }
     };
 
-    fetchProductList();
-    return () => { alive = false; };
-  }, [selectedCategories, selectedColors]);
+    load();
+    return () => {
+      alive = false;
+    };
+  }, [selectedCategories, selectedColors, minPrice, maxPrice, sort]);
 
-  const renderCheckbox = (
+  // ---- Render helpers ----
+  const renderCheck = (
+    id: string,
     label: string,
-    state: string[],
-    setState: React.Dispatch<React.SetStateAction<string[]>>
+    checked: boolean,
+    onToggle: () => void
   ) => (
     <div className="flex items-center space-x-2">
-      <Checkbox
-        id={label}
-        checked={state.includes(label)}
-        onCheckedChange={() => toggleFilter(label, setState)}
-      />
-      <label htmlFor={label} className="text-sm font-medium leading-none">
+      <Checkbox id={id} checked={checked} onCheckedChange={onToggle} />
+      <label
+        htmlFor={id}
+        className="text-sm font-medium leading-none cursor-pointer"
+      >
         {label}
       </label>
     </div>
@@ -78,36 +127,116 @@ function ShopPage() {
     <div className="px-4 md:px-8">
       <div className="mt-6 md:mt-10 mb-10 text-center">
         <h2 className="text-2xl md:text-3xl">SHOP BY CATEGORIES</h2>
-        <p className="text-[#7A7879] text-sm md:text-base">Our new cozy collection is made for you</p>
+        <p className="text-[#7A7879] text-sm md:text-base">
+          Our new cozy collection is made for you
+        </p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-5">
         {/* Filters */}
         <aside className="border border-[#C7C7C7] rounded p-3 w-full md:w-[320px]">
           <Accordion type="single" collapsible>
+            {/* Category */}
             <AccordionItem value="category">
-              <AccordionTrigger className="text-base md:text-lg">Category</AccordionTrigger>
+              <AccordionTrigger className="text-base md:text-lg">
+                Category
+              </AccordionTrigger>
               <AccordionContent>
                 <ol className="flex flex-col gap-2">
-                  {["oversized-t-shirts","full-sleev","t-shirt","hoodie"].map((cat) => (
-                    <li key={cat}>
-                      {renderCheckbox(cat.toLowerCase(), selectedCategories, setSelectedCategories)}
+                  {flatCats.map((c) => (
+                    <li key={c.slug}>
+                      {renderCheck(
+                        c.slug,
+                        c.name,
+                        selectedCategories.includes(c.slug),
+                        () => toggleStrInArray(c.slug, setSelectedCategories)
+                      )}
                     </li>
                   ))}
                 </ol>
               </AccordionContent>
             </AccordionItem>
 
+            {/* Color */}
             <AccordionItem value="color">
-              <AccordionTrigger className="text-base md:text-lg">Color</AccordionTrigger>
+              <AccordionTrigger className="text-base md:text-lg">
+                Color
+              </AccordionTrigger>
               <AccordionContent>
                 <ol className="flex flex-col gap-2">
-                  {["RED","BLUE","BLACK","GREEN","WHITE"].map((color) => (
-                    <li key={color}>
-                      {renderCheckbox(color, selectedColors, setSelectedColors)}
+                  {["RED", "BLUE", "BLACK", "GREEN", "WHITE"].map((clr) => (
+                    <li key={clr}>
+                      {renderCheck(
+                        `color-${clr}`,
+                        clr,
+                        selectedColors.includes(clr),
+                        () => toggleStrInArray(clr, setSelectedColors)
+                      )}
                     </li>
                   ))}
                 </ol>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Price */}
+            <AccordionItem value="price">
+              <AccordionTrigger className="text-base md:text-lg">
+                Price
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    className="w-full border rounded px-2 py-1"
+                    placeholder="Min"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    min={0}
+                  />
+                  <span className="text-gray-500">–</span>
+                  <input
+                    type="number"
+                    className="w-full border rounded px-2 py-1"
+                    placeholder="Max"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    min={0}
+                  />
+                </div>
+                <button
+                  className="mt-2 text-xs underline text-gray-600"
+                  type="button"
+                  onClick={() => {
+                    setMinPrice("");
+                    setMaxPrice("");
+                  }}
+                >
+                  Clear price
+                </button>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Sort */}
+            <AccordionItem value="sort">
+              <AccordionTrigger className="text-base md:text-lg">
+                Sort
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="flex flex-col gap-2">
+                  {renderCheck(
+                    "sort-l2h",
+                    "Price: Low to High",
+                    sort === "price_asc",
+                    () => setSort((s) => (s === "price_asc" ? "" : "price_asc"))
+                  )}
+                  {renderCheck(
+                    "sort-h2l",
+                    "Price: High to Low",
+                    sort === "price_desc",
+                    () =>
+                      setSort((s) => (s === "price_desc" ? "" : "price_desc"))
+                  )}
+                </div>
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -130,15 +259,13 @@ function ShopPage() {
                   <div className="mt-3 h-4 bg-gray-200 rounded" />
                   <div className="mt-2 h-4 w-1/3 bg-gray-200 rounded" />
                 </div>
-              ))
-            }
+              ))}
 
             {/* Items */}
             {!loading &&
-              productList.map((productDetail) => (
-                <ProductListCard key={productDetail._id} productDetail={productDetail} />
-              ))
-            }
+              productList.map((pd) => (
+                <ProductListCard key={pd._id} productDetail={pd} />
+              ))}
           </div>
 
           {/* Empty (no error, no loading, no items) */}

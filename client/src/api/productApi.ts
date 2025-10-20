@@ -48,3 +48,37 @@ export const fetchProducts = async (
   );
   return response.data.products;
 };
+
+
+
+export const fetchProductsFiltered = async (params: {
+  page?: number;
+  limit?: number;
+  categories?: string[];       // slugs/names
+  colors?: string[];           // names, e.g. ["RED","BLUE"]
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: "price_asc" | "price_desc"; // optional
+}): Promise<{ products: ProductDetail[]; pageNo: number; totalPages: number; totalProducts: number }> => {
+  const {
+    page = 1,
+    limit = 12,
+    categories,
+    colors,
+    minPrice,
+    maxPrice,
+    sort,
+  } = params;
+
+  const query = new URLSearchParams();
+  query.set("page", String(page));
+  query.set("limit", String(limit));
+  if (categories?.length) query.set("category", categories.join(","));
+  if (colors?.length) query.set("color", colors.join(","));
+  if (minPrice != null) query.set("minPrice", String(minPrice));
+  if (maxPrice != null) query.set("maxPrice", String(maxPrice));
+  if (sort) query.set("sort", sort);
+
+  const { data } = await api.get(`/api/user/product/getProducts?${query.toString()}`);
+  return data;
+};

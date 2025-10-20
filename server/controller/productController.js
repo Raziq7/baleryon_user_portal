@@ -2,55 +2,105 @@ import asyncHandler from "express-async-handler";
 import Product from "../models/Product.js";
 import sanitizedConfig from "../config.js";
 
-// @desc    Get paginated list of products
-// @route   GET /api/products
+// @desc    Get paginated list of products (with filters & sort)
+// @route   GET /api/user/product/getProducts
 // @access  Public
 export const getProductsController = asyncHandler(async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 12;
     const skip = (page - 1) * limit;
 
-    const { category, color, minPrice, maxPrice } = req.query;
+    const { category, color, minPrice, maxPrice, sort } = req.query;
 
-    const filter = {};
+    const filter = { isActive: true };
+    const andParts = [];
 
-    // Filter by category
+    // ---- Category filter (safe for mixed schema) ----
     if (category) {
-      filter.category = category;
+      const catList = String(category)
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
+
+      if (catList.length) {
+        andParts.push({
+          $or: [
+            { "category.slug": { $in: catList } },
+            { "subcategory.slug": { $in: catList } },
+            { "subSubcategory.slug": { $in: catList } },
+
+            // legacy string fields guarded by type
+            {
+              $expr: {
+                $and: [
+                  { $eq: [{ $type: "$category" }, "string"] },
+                  { $in: ["$category", catList] },
+                ],
+              },
+            },
+            {
+              $expr: {
+                $and: [
+                  { $eq: [{ $type: "$subcategory" }, "string"] },
+                  { $in: ["$subcategory", catList] },
+                ],
+              },
+            },
+            {
+              $expr: {
+                $and: [
+                  { $eq: [{ $type: "$subSubcategory" }, "string"] },
+                  { $in: ["$subSubcategory", catList] },
+                ],
+              },
+            },
+          ],
+        });
+      }
     }
 
-    // Filter by color (supports comma-separated values)
+    // ---- Color filter (legacy CSV or array "colors") ----
     if (color) {
-      const colorArray = color.split(",").map((c) => c.trim().toUpperCase());
-      filter.color = { $regex: colorArray.join("|"), $options: "i" };
+      const colorList = String(color)
+        .split(",")
+        .map((c) => c.trim().toUpperCase())
+        .filter(Boolean);
+      if (colorList.length) {
+        andParts.push({
+          $or: [
+            { color: { $regex: colorList.join("|"), $options: "i" } },
+            { colors: { $in: colorList } },
+          ],
+        });
+      }
     }
 
-    // Filter by price
-    if (minPrice || maxPrice) {
-      filter.price = {};
-      if (minPrice) filter.price.$gte = parseInt(minPrice);
-      if (maxPrice) filter.price.$lte = parseInt(maxPrice);
-    }
+    // ---- Price filter ----
+    const priceQuery = {};
+    if (minPrice) priceQuery.$gte = Number(minPrice);
+    if (maxPrice) priceQuery.$lte = Number(maxPrice);
+    if (Object.keys(priceQuery).length) andParts.push({ price: priceQuery });
 
-    // Fetch products with applied filters
-    const products = await Product.find(filter).skip(skip).limit(limit);
+    if (andParts.length) filter.$and = andParts;
 
-    // If no products found after applying filters, return a message
-    if (products.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No data found for the given filters" });
-    }
+    // ---- Sorting ----
+    const sortSpec =
+      String(sort) === "price_asc"
+        ? { price: 1 }
+        : String(sort) === "price_desc"
+        ? { price: -1 }
+        : { createdAt: -1 };
 
-    // Get total products count based on the filter
-    const totalProducts = await Product.countDocuments(filter);
-    const totalPages = Math.ceil(totalProducts / limit);
+    const [products, totalProducts] = await Promise.all([
+      Product.find(filter).sort(sortSpec).skip(skip).limit(limit),
+      Product.countDocuments(filter),
+    ]);
 
     res.status(200).json({
       products,
-      page,
-      totalPages,
+      pageNo: page,
+      totalPages: Math.ceil(totalProducts / limit),
       totalProducts,
     });
   } catch (error) {
@@ -58,6 +108,8 @@ export const getProductsController = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 });
+
+
 
 // @desc    Get product details by ID
 // @route   GET /api/products/:id
